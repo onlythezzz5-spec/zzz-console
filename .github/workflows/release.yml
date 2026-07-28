@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Existing GitHub release tag to receive build assets
         required: true
-        default: v1.1.0
+        default: v1.2.0
   release:
     types: [published]
   push:
@@ -21,7 +21,7 @@ on:
       - '**.go'
       - 'go.mod'
       - 'go.sum'
-      - 'x-ui.service'
+      - 'zzz.service'
 
 jobs:
   # ===============================================================
@@ -80,18 +80,18 @@ jobs:
           export CC=$(realpath "$(find "$TOOLCHAIN_DIR/bin" -name '*-gcc.br_real' -type f -executable | head -n1)")
           [ -z "$CC" ] && { echo "No gcc.br_real found in $TOOLCHAIN_DIR/bin" >&2; exit 1; }
           cd -
-          go build -ldflags "-w -s -linkmode external -extldflags '-static'" -o xui-release -v main.go
-          file xui-release
-          ldd xui-release || echo "Static binary confirmed"
+          go build -ldflags "-w -s -linkmode external -extldflags '-static'" -o zzz-release -v main.go
+          file zzz-release
+          ldd zzz-release || echo "Static binary confirmed"
           
-          mkdir x-ui
-          cp xui-release x-ui/
-          cp x-ui.service x-ui/
-          cp x-ui.sh x-ui/
-          cp -r tools x-ui/
-          mv x-ui/xui-release x-ui/x-ui
-          mkdir x-ui/bin
-          cd x-ui/bin
+          mkdir zzz
+          cp zzz-release zzz/
+          cp zzz.service zzz/
+          cp zzz.sh zzz/
+          cp -r tools zzz/
+          mv zzz/zzz-release zzz/zzz
+          mkdir zzz/bin
+          cd zzz/bin
           
           # Download dependencies
           Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v26.4.17/"
@@ -135,13 +135,13 @@ jobs:
           cd ../..
 
       - name: Package
-        run: tar -zcvf x-ui-linux-${{ matrix.platform }}.tar.gz x-ui
+        run: tar -zcvf zzz-linux-${{ matrix.platform }}.tar.gz zzz
 
       - name: Upload files to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: x-ui-linux-${{ matrix.platform }}
-          path: ./x-ui-linux-${{ matrix.platform }}.tar.gz
+          name: zzz-linux-${{ matrix.platform }}
+          path: ./zzz-linux-${{ matrix.platform }}.tar.gz
 
       - name: Upload files to GH release
         uses: svenstaro/upload-release-action@v2
@@ -149,8 +149,8 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
-          file: x-ui-linux-${{ matrix.platform }}.tar.gz
-          asset_name: x-ui-linux-${{ matrix.platform }}.tar.gz
+          file: zzz-linux-${{ matrix.platform }}.tar.gz
+          asset_name: zzz-linux-${{ matrix.platform }}.tar.gz
           # 如果这是预发布版本，可以此行注释
           prerelease: true  
 
@@ -190,17 +190,17 @@ jobs:
           $env:CGO_ENABLED = "0"
 
           # 〔中文注释〕: 执行 Go 编译命令。-o 指定输出文件为 .exe 可执行文件
-          go build -ldflags "-w -s" -o x-ui-release.exe -v main.go
+          go build -ldflags "-w -s" -o zzz-release.exe -v main.go
 
           # 〔中文注释〕: 创建用于打包的文件夹
-          mkdir x-ui
+          mkdir zzz
           
-          # 〔中文注释〕: 移动编译好的主程序到文件夹，并重命名为 x-ui.exe
-          Move-Item -Path .\x-ui-release.exe -Destination .\x-ui\x-ui.exe
+          # 〔中文注释〕: 移动编译好的主程序到文件夹，并重命名为 zzz.exe
+          Move-Item -Path .\zzz-release.exe -Destination .\zzz\zzz.exe
 
           # 〔中文注释〕: 创建 bin 目录存放依赖文件
-          mkdir x-ui\bin
-          cd x-ui\bin
+          mkdir zzz\bin
+          cd zzz\bin
           
           # 〔中文注释〕: 下载 Windows 版本的 Xray-core 依赖
           # 注意：这里的 Xray 版本号 (v26.4.17) 沿用 Linux 脚本中的版本
@@ -229,11 +229,11 @@ jobs:
           # 〔中文注释〕: 将解压出的 xray.exe 重命名，以便区分
           Move-Item -Path .\xray.exe -Destination "xray-windows-${{ matrix.platform }}.exe"
 
-          # 〔中文注释〕: 返回到 x-ui 文件夹的根目录
+          # 〔中文注释〕: 返回到 zzz 文件夹的根目录
           cd ..
           
           # ===============================================================
-          # 【新增部分】从仓库复制辅助文件到待打包的 x-ui 目录中
+          # 【新增部分】从仓库复制辅助文件到待打包的 zzz 目录中
           # 辅助文件都放在了项目根目录的 windows_files 文件夹下
           # ===============================================================
           Copy-Item -Path ..\windows_files\* -Destination . -Recurse
@@ -243,18 +243,18 @@ jobs:
           cd ..
 
       - name: Package to Zip
-        # 〔中文注释〕: 使用 PowerShell 命令将 x-ui 文件夹打包成 zip 压缩包
+        # 〔中文注释〕: 使用 PowerShell 命令将 zzz 文件夹打包成 zip 压缩包
         shell: pwsh
         run: |
-          Compress-Archive -Path .\x-ui -DestinationPath "x-ui-windows-${{ matrix.platform }}.zip"
+          Compress-Archive -Path .\zzz -DestinationPath "zzz-windows-${{ matrix.platform }}.zip"
 
       - name: Upload files to Artifacts
         uses: actions/upload-artifact@v4
         with:
           # 〔中文注释〕: 上传的构建产物名称，明确标识为 windows
-          name: x-ui-windows-${{ matrix.platform }}
+          name: zzz-windows-${{ matrix.platform }}
           # 〔中文注释〕: 上传的压缩包路径
-          path: ./x-ui-windows-${{ matrix.platform }}.zip
+          path: ./zzz-windows-${{ matrix.platform }}.zip
 
       - name: Upload files to GH release
         uses: svenstaro/upload-release-action@v2
@@ -263,7 +263,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
           # 〔中文注释〕: 指定要上传的文件为 windows 的 zip 包
-          file: x-ui-windows-${{ matrix.platform }}.zip
+          file: zzz-windows-${{ matrix.platform }}.zip
           # 〔中文注释〕: 在 Release 页面显示的资产名称
-          asset_name: x-ui-windows-${{ matrix.platform }}.zip
+          asset_name: zzz-windows-${{ matrix.platform }}.zip
           prerelease: true

@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"x-ui/logger"
-	"x-ui/xray"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/xray"
 )
 
 type ClearLogsJob struct{}

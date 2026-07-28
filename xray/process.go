@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"x-ui/config"
-	"x-ui/logger"
-	"x-ui/util/common"
+	"github.com/onlythezzz5-spec/zzz-console/config"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/util/common"
 )
 
 func GetBinaryName() string {
@@ -247,7 +247,7 @@ func (p *process) Stop() error {
 	if !p.IsRunning() {
 		return errors.New("xray is not running")
 	}
-	
+
 	if runtime.GOOS == "windows" {
 		return p.cmd.Process.Kill()
 	} else {

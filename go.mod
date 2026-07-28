@@ -1,4 +1,4 @@
-module x-ui
+module github.com/onlythezzz5-spec/zzz-console
 
 go 1.26.2
 

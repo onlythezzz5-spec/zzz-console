@@ -43,8 +43,8 @@ bash <(curl -Ls https://raw.githubusercontent.com/onlythezzz5-spec/zzz-console/m
 2. 安装 `curl`、`wget`、`tar` 等基础依赖
 3. 获取最新正式版本
 4. 下载对应架构的发布包
-5. 安装到 `/usr/local/x-ui/`
-6. 注册并启动 `x-ui.service`
+5. 安装到 `/usr/local/zzz/`
+6. 注册并启动 `zzz.service`
 7. 引导设置用户名、密码、端口和访问路径
 
 安装完成后立即保存终端输出的登录信息。
@@ -52,13 +52,13 @@ bash <(curl -Ls https://raw.githubusercontent.com/onlythezzz5-spec/zzz-console/m
 ## 3. 查看登录信息
 
 ```bash
-x-ui settings
+zzz settings
 ```
 
 或：
 
 ```bash
-x-ui
+zzz
 ```
 
 选择 `10. 查看面板设置`。
@@ -106,7 +106,7 @@ ping panel.example.com
 执行：
 
 ```bash
-x-ui
+zzz
 ```
 
 进入 `18. SSL 证书管理`：
@@ -133,7 +133,7 @@ https://panel.example.com:面板端口/访问路径/
 执行：
 
 ```bash
-x-ui
+zzz
 ```
 
 进入 `21. 防火墙管理`，放行：
@@ -156,8 +156,8 @@ x-ui
 保存后若无法连接，先检查：
 
 ```bash
-x-ui status
-x-ui log
+zzz status
+zzz log
 ss -lntup
 ufw status
 ```
@@ -165,19 +165,19 @@ ufw status
 ## 9. 更新
 
 ```bash
-x-ui update
+zzz update
 ```
 
 更新前先从面板首页导出数据库，或备份：
 
 ```text
-/etc/x-ui/x-ui.db
+/etc/zzz/zzz.db
 ```
 
 ## 10. 卸载
 
 ```bash
-x-ui uninstall
+zzz uninstall
 ```
 
 卸载前必须先导出数据库。卸载会移除程序和 systemd 服务。

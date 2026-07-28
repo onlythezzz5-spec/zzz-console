@@ -3,9 +3,9 @@ package controller
 import (
 	"net/http"
 
-	"x-ui/logger"
-	"x-ui/web/locale"
-	"x-ui/web/session"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/web/locale"
+	"github.com/onlythezzz5-spec/zzz-console/web/session"
 
 	"github.com/gin-gonic/gin"
 )

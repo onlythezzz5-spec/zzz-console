@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"x-ui/web/service"
+	"github.com/onlythezzz5-spec/zzz-console/web/service"
 
 	"github.com/gin-gonic/gin"
 )

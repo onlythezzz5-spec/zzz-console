@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"x-ui/database"
-	"x-ui/database/model"
-	"x-ui/logger"
-	"x-ui/util/common"
-	"x-ui/util/random"
-	"x-ui/web/service"
-	"x-ui/xray"
+	"github.com/onlythezzz5-spec/zzz-console/database"
+	"github.com/onlythezzz5-spec/zzz-console/database/model"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/util/common"
+	"github.com/onlythezzz5-spec/zzz-console/util/random"
+	"github.com/onlythezzz5-spec/zzz-console/web/service"
+	"github.com/onlythezzz5-spec/zzz-console/xray"
 
 	"github.com/goccy/go-json"
 )
@@ -310,9 +310,9 @@ func (s *SubService) genVlessLink(inbound *model.Inbound, email string) string {
 	if inbound.Protocol != model.VLESS {
 		return ""
 	}
-		var vlessSettings model.VLESSSettings
+	var vlessSettings model.VLESSSettings
 	_ = json.Unmarshal([]byte(inbound.Settings), &vlessSettings)
-	
+
 	var stream map[string]any
 	json.Unmarshal([]byte(inbound.StreamSettings), &stream)
 	clients, _ := s.inboundService.GetClients(inbound)
@@ -327,7 +327,7 @@ func (s *SubService) genVlessLink(inbound *model.Inbound, email string) string {
 	port := inbound.Port
 	streamNetwork := stream["network"].(string)
 	params := make(map[string]string)
-		if vlessSettings.Encryption != "" {
+	if vlessSettings.Encryption != "" {
 		params["encryption"] = vlessSettings.Encryption
 	}
 	params["type"] = streamNetwork

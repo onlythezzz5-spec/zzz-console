@@ -5,7 +5,7 @@ import (
 	"syscall"
 	"time"
 
-	"x-ui/logger"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
 )
 
 type PanelService struct{}

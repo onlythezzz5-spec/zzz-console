@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"x-ui/database/model"
-	"x-ui/web/service"
-	"x-ui/web/session"
+	"github.com/onlythezzz5-spec/zzz-console/database/model"
+	"github.com/onlythezzz5-spec/zzz-console/web/service"
+	"github.com/onlythezzz5-spec/zzz-console/web/session"
 
 	"github.com/gin-gonic/gin"
 )

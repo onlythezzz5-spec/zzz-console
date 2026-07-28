@@ -349,7 +349,7 @@
 "modalContent" = "\r\n即将检测并跳转至：\r\n您的订阅转换服务页面，是否继续？"
 "modalOk" = "继续"
 "notFoundTitle" = "【订阅转换服务】未安装或无法访问"
-"notFoundContent" = "\r\n请进入VPS服务器终端，输入 x-ui 命令，\r\n并选择选项【25】进行安装。"
+"notFoundContent" = "\r\n请进入VPS服务器终端，输入 zzz 命令，\r\n并选择选项【25】进行安装。"
 
 [pages.settings]
 "title" = "面板设置"

@@ -38,7 +38,7 @@ func GetLogLevel() LogLevel {
 	if IsDebug() {
 		return Debug
 	}
-	logLevel := os.Getenv("XUI_LOG_LEVEL")
+	logLevel := firstEnv("ZZZ_LOG_LEVEL", "XUI_LOG_LEVEL")
 	if logLevel == "" {
 		return Info
 	}
@@ -46,11 +46,11 @@ func GetLogLevel() LogLevel {
 }
 
 func IsDebug() bool {
-	return os.Getenv("XUI_DEBUG") == "true"
+	return firstEnv("ZZZ_DEBUG", "XUI_DEBUG") == "true"
 }
 
 func GetBinFolderPath() string {
-	binFolderPath := os.Getenv("XUI_BIN_FOLDER")
+	binFolderPath := firstEnv("ZZZ_BIN_FOLDER", "XUI_BIN_FOLDER")
 	if binFolderPath == "" {
 		binFolderPath = "bin"
 	}
@@ -75,14 +75,14 @@ func getBaseDir() string {
 }
 
 func GetDBFolderPath() string {
-	dbFolderPath := os.Getenv("XUI_DB_FOLDER")
+	dbFolderPath := firstEnv("ZZZ_DB_FOLDER", "XUI_DB_FOLDER")
 	if dbFolderPath != "" {
 		return dbFolderPath
 	}
 	if runtime.GOOS == "windows" {
 		return getBaseDir()
 	}
-	return "/etc/x-ui"
+	return "/etc/zzz"
 }
 
 func GetDBPath() string {
@@ -90,7 +90,7 @@ func GetDBPath() string {
 }
 
 func GetLogFolder() string {
-	logFolderPath := os.Getenv("XUI_LOG_FOLDER")
+	logFolderPath := firstEnv("ZZZ_LOG_FOLDER", "XUI_LOG_FOLDER")
 	if logFolderPath != "" {
 		return logFolderPath
 	}
@@ -121,24 +121,40 @@ func copyFile(src, dst string) error {
 	return out.Sync()
 }
 
+func firstEnv(names ...string) string {
+	for _, name := range names {
+		if value := os.Getenv(name); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func init() {
-	if runtime.GOOS != "windows" {
-		return
-	}
-	if os.Getenv("XUI_DB_FOLDER") != "" {
-		return
-	}
-	oldDBFolder := "/etc/x-ui"
-	oldDBPath := fmt.Sprintf("%s/%s.db", oldDBFolder, GetName())
 	newDBFolder := GetDBFolderPath()
 	newDBPath := fmt.Sprintf("%s/%s.db", newDBFolder, GetName())
-	_, err := os.Stat(newDBPath)
-	if err == nil {
-		return // new exists
+	if _, err := os.Stat(newDBPath); err == nil {
+		return
 	}
-	_, err = os.Stat(oldDBPath)
-	if os.IsNotExist(err) {
-		return // old does not exist
+
+	if runtime.GOOS != "windows" {
+		_ = os.MkdirAll(newDBFolder, 0750)
 	}
-	_ = copyFile(oldDBPath, newDBPath) // ignore error
+
+	legacyPaths := []string{
+		filepath.Join(newDBFolder, "x-ui.db"),
+		"/etc/x-ui/x-ui.db",
+	}
+	if runtime.GOOS == "windows" {
+		legacyPaths = append([]string{filepath.Join(getBaseDir(), "x-ui.db")}, legacyPaths...)
+	}
+
+	for _, oldDBPath := range legacyPaths {
+		if _, err := os.Stat(oldDBPath); err != nil {
+			continue
+		}
+		if copyFile(oldDBPath, newDBPath) == nil {
+			return
+		}
+	}
 }

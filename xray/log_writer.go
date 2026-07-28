@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"x-ui/logger"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
 )
 
 func NewLogWriter() *LogWriter {

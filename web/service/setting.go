@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"x-ui/database"
-	"x-ui/database/model"
-	"x-ui/logger"
-	"x-ui/util/common"
-	"x-ui/util/random"
-	"x-ui/util/reflect_util"
-	"x-ui/web/entity"
-	"x-ui/xray"
+	"github.com/onlythezzz5-spec/zzz-console/database"
+	"github.com/onlythezzz5-spec/zzz-console/database/model"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/util/common"
+	"github.com/onlythezzz5-spec/zzz-console/util/random"
+	"github.com/onlythezzz5-spec/zzz-console/util/reflect_util"
+	"github.com/onlythezzz5-spec/zzz-console/web/entity"
+	"github.com/onlythezzz5-spec/zzz-console/xray"
 )
 
 //go:embed config.json

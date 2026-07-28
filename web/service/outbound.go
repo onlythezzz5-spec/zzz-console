@@ -1,10 +1,10 @@
 package service
 
 import (
-	"x-ui/database"
-	"x-ui/database/model"
-	"x-ui/logger"
-	"x-ui/xray"
+	"github.com/onlythezzz5-spec/zzz-console/database"
+	"github.com/onlythezzz5-spec/zzz-console/database/model"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/xray"
 
 	"gorm.io/gorm"
 )

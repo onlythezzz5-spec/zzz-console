@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"x-ui/config"
-	"x-ui/logger"
-	"x-ui/web/entity"
+	"github.com/onlythezzz5-spec/zzz-console/config"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/web/entity"
 
 	"github.com/gin-gonic/gin"
 )

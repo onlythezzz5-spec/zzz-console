@@ -10,8 +10,8 @@ TimeoutStopSec=20s
 
 Environment="XRAY_VMESS_AEAD_FORCED=false"
 Type=simple
-WorkingDirectory=/usr/local/x-ui/
-ExecStart=/usr/local/x-ui/x-ui
+WorkingDirectory=/usr/local/zzz/
+ExecStart=/usr/local/zzz/zzz
 RestartSec=5s
 
 [Install]

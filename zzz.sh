@@ -37,9 +37,9 @@ fi
 echo -e "——————————————————————"
 echo -e "当前服务器的操作系统为:${red} $release${plain}"
 echo ""
-xui_version=$(/usr/local/x-ui/x-ui -v)
+zzz_version=$(/usr/local/zzz/zzz -v)
 last_version=$(curl -Ls "https://api.github.com/repos/onlythezzz5-spec/zzz-console/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-echo -e "${green}当前代理面板的版本为: ${red}〔ZZZ Console〕v${xui_version}${plain}"
+echo -e "${green}当前代理面板的版本为: ${red}〔ZZZ Console〕v${zzz_version}${plain}"
 echo ""
 echo -e "${yellow}〔ZZZ Console〕最新版为---------->>> ${last_version}${plain}"
 
@@ -108,7 +108,7 @@ else
 fi
 
 # Declare Variables
-log_folder="${XUI_LOG_FOLDER:=/var/log}"
+log_folder="${ZZZ_LOG_FOLDER:-${XUI_LOG_FOLDER:-/var/log}}"
 iplimit_log_path="${log_folder}/3xipl.log"
 iplimit_banned_log_path="${log_folder}/3xipl-banned.log"
 
@@ -179,11 +179,11 @@ update_menu() {
         fi
         return 0
     fi
-    
-    wget --no-check-certificate -O /usr/bin/x-ui https://raw.githubusercontent.com/onlythezzz5-spec/zzz-console/main/x-ui.sh
-    chmod +x /usr/local/x-ui/x-ui.sh
-    chmod +x /usr/bin/x-ui
-    
+
+    wget --no-check-certificate -O /usr/bin/zzz https://raw.githubusercontent.com/onlythezzz5-spec/zzz-console/main/zzz.sh
+    chmod +x /usr/local/zzz/zzz.sh
+    chmod +x /usr/bin/zzz
+
      if [[ $? == 0 ]]; then
         echo -e "${green}更新成功，面板已自动重启${plain}"
         exit 0
@@ -225,13 +225,19 @@ uninstall() {
         fi
         return 0
     fi
-    systemctl stop x-ui
-    systemctl disable x-ui
+    systemctl stop zzz
+    systemctl disable zzz
+    rm /etc/systemd/system/zzz.service -f
+    systemctl stop x-ui >/dev/null 2>&1 || true
+    systemctl disable x-ui >/dev/null 2>&1 || true
     rm /etc/systemd/system/x-ui.service -f
     systemctl daemon-reload
     systemctl reset-failed
+    rm /etc/zzz/ -rf
+    rm /usr/local/zzz/ -rf
     rm /etc/x-ui/ -rf
     rm /usr/local/x-ui/ -rf
+    rm -f /usr/bin/zzz /usr/bin/x-ui
 
     echo ""
     echo -e "卸载成功\n"
@@ -255,8 +261,8 @@ reset_user() {
     [[ -z $config_account ]] && config_account=$(date +%s%N | md5sum | cut -c 1-8)
     read -rp "请设置密码 [默认为随机密码]: " config_password
     [[ -z $config_password ]] && config_password=$(date +%s%N | md5sum | cut -c 1-8)
-    /usr/local/x-ui/x-ui setting -username ${config_account} -password ${config_password} >/dev/null 2>&1
-    /usr/local/x-ui/x-ui setting -remove_secret >/dev/null 2>&1
+    /usr/local/zzz/zzz setting -username ${config_account} -password ${config_password} >/dev/null 2>&1
+    /usr/local/zzz/zzz setting -remove_secret >/dev/null 2>&1
     echo -e "面板登录用户名已重置为：${green} ${config_account} ${plain}"
     echo -e "面板登录密码已重置为：${green} ${config_password} ${plain}"
     echo -e "${yellow} 面板 Secret Token 已禁用 ${plain}"
@@ -272,18 +278,18 @@ gen_random_string() {
 
 reset_webbasepath() {
     echo -e "${yellow}修改访问路径${plain}"
-    
+
     # Prompt user to set a new web base path
     read -rp "请设置新的访问路径（若回车默认或输入y则为随机路径）: " config_webBasePath
-    
+
     if [[ $config_webBasePath == "y" ]]; then
         config_webBasePath=$(gen_random_string 18)
     fi
-    
+
     # Apply the new web base path setting
-    /usr/local/x-ui/x-ui setting -webBasePath "${config_webBasePath}" >/dev/null 2>&1
-    systemctl restart x-ui
-    
+    /usr/local/zzz/zzz setting -webBasePath "${config_webBasePath}" >/dev/null 2>&1
+    systemctl restart zzz
+
     # Display confirmation message
     echo -e "面板访问路径已重置为: ${green}${config_webBasePath}${plain}"
     echo -e "${green}请使用新的路径登录访问面板${plain}"
@@ -297,32 +303,32 @@ reset_config() {
         fi
         return 0
     fi
-    /usr/local/x-ui/x-ui setting -reset
+    /usr/local/zzz/zzz setting -reset
     echo -e "所有面板设置已重置为默认，请立即重新启动面板，并使用默认的${green}13688${plain}端口访问网页面板"
     confirm_restart
 }
 
 check_config() {
-    info=$(/usr/local/x-ui/x-ui setting -show true)
+    info=$(/usr/local/zzz/zzz setting -show true)
     if [[ $? != 0 ]]; then
         LOGE "获取当前设置错误，请检查日志"
         show_menu
     fi
     echo -e "${info}${plain}"
     echo ""
-    
+
     # 获取 IPv4 和 IPv6 地址
     v4=$(curl -s4m8 http://ip.sb -k)
     v6=$(curl -s6m8 http://ip.sb -k)
-    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}') 
-    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}') 
-    local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
-    local existing_key=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'key: .+' | awk '{print $2}')
+    local existing_webBasePath=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}')
+    local existing_port=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}')
+    local existing_cert=$(/usr/local/zzz/zzz setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
+    local existing_key=$(/usr/local/zzz/zzz setting -getCert true | grep -Eo 'key: .+' | awk '{print $2}')
 
     if [[ -n "$existing_cert" && -n "$existing_key" ]]; then
         echo -e "${green}面板已安装证书采用SSL保护${plain}"
         echo ""
-        local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
+        local existing_cert=$(/usr/local/zzz/zzz setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
         domain=$(basename "$(dirname "$existing_cert")")
         echo -e "${green}登录访问面板URL: https://${domain}:${existing_port}${green}${existing_webBasePath}${plain}"
     fi
@@ -375,7 +381,7 @@ set_port() {
         LOGD "Cancelled"
         before_show_menu
     else
-        /usr/local/x-ui/x-ui setting -port ${port}
+        /usr/local/zzz/zzz setting -port ${port}
         echo -e "端口已设置，请立即重启面板，并使用新端口 ${green}${port}${plain} 以访问面板"
         confirm_restart
     fi
@@ -387,7 +393,7 @@ start() {
         echo ""
         LOGI "面板正在运行，无需再次启动，如需重新启动，请选择重新启动"
     else
-        systemctl start x-ui
+        systemctl start zzz
         sleep 2
         check_status
         if [[ $? == 0 ]]; then
@@ -408,7 +414,7 @@ stop() {
         echo ""
         LOGI "面板已关闭，无需再次关闭！"
     else
-        systemctl stop x-ui
+        systemctl stop zzz
         sleep 2
         check_status
         if [[ $? == 1 ]]; then
@@ -424,7 +430,7 @@ stop() {
 }
 
 restart() {
-    systemctl restart x-ui
+    systemctl restart zzz
     sleep 2
     check_status
     if [[ $? == 0 ]]; then
@@ -438,18 +444,18 @@ restart() {
 }
 
 status() {
-    systemctl status x-ui -l
+    systemctl status zzz -l
     if [[ $# == 0 ]]; then
         before_show_menu
     fi
 }
 
 enable() {
-    systemctl enable x-ui
+    systemctl enable zzz
     if [[ $? == 0 ]]; then
-        LOGI "x-ui 已成功设置开机启动"
+        LOGI "zzz 已成功设置开机启动"
     else
-        LOGE "x-ui 设置开机启动失败"
+        LOGE "zzz 设置开机启动失败"
     fi
 
     if [[ $# == 0 ]]; then
@@ -458,11 +464,11 @@ enable() {
 }
 
 disable() {
-    systemctl disable x-ui
+    systemctl disable zzz
     if [[ $? == 0 ]]; then
-        LOGI "x-ui 已成功取消开机启动"
+        LOGI "zzz 已成功取消开机启动"
     else
-        LOGE "x-ui 取消开机启动失败"
+        LOGE "zzz 取消开机启动失败"
     fi
 
     if [[ $# == 0 ]]; then
@@ -471,7 +477,7 @@ disable() {
 }
 
 show_log() {
-    journalctl -u x-ui.service -e --no-pager -f
+    journalctl -u zzz.service -e --no-pager -f
     if [[ $# == 0 ]]; then
         before_show_menu
     fi
@@ -559,23 +565,23 @@ enable_bbr() {
 }
 
 update_shell() {
-    wget -O /usr/bin/x-ui -N --no-check-certificate https://github.com/onlythezzz5-spec/zzz-console/raw/main/x-ui.sh
+    wget -O /usr/bin/zzz -N --no-check-certificate https://github.com/onlythezzz5-spec/zzz-console/raw/main/zzz.sh
     if [[ $? != 0 ]]; then
         echo ""
         LOGE "下载脚本失败，请检查机器是否可以连接至 GitHub"
         before_show_menu
     else
-        chmod +x /usr/bin/x-ui
+        chmod +x /usr/bin/zzz
         LOGI "升级脚本成功，请重新运行脚本" && exit 0
     fi
 }
 
 # 0: running, 1: not running, 2: not installed
 check_status() {
-    if [[ ! -f /etc/systemd/system/x-ui.service ]]; then
+    if [[ ! -f /etc/systemd/system/zzz.service ]]; then
         return 2
     fi
-    temp=$(systemctl status x-ui | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
+    temp=$(systemctl status zzz | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
     if [[ "${temp}" == "running" ]]; then
         return 0
     else
@@ -584,7 +590,7 @@ check_status() {
 }
 
 check_enabled() {
-    temp=$(systemctl is-enabled x-ui)
+    temp=$(systemctl is-enabled zzz)
     if [[ "${temp}" == "enabled" ]]; then
         return 0
     else
@@ -776,8 +782,8 @@ delete_ports() {
 }
 
 update_geo() {
-    local defaultBinFolder="/usr/local/x-ui/bin"
-    read -p "请输入 x-ui bin 文件夹路径，默认留空。（默认值：'${defaultBinFolder}')" binFolder
+    local defaultBinFolder="/usr/local/zzz/bin"
+    read -p "请输入 zzz bin 文件夹路径，默认留空。（默认值：'${defaultBinFolder}')" binFolder
     binFolder=${binFolder:-${defaultBinFolder}}
     if [[ ! -d ${binFolder} ]]; then
         LOGE "文件夹 ${binFolder} 不存在！"
@@ -785,7 +791,7 @@ update_geo() {
         mkdir -p ${binFolder}
     fi
 
-    systemctl stop x-ui
+    systemctl stop zzz
     cd ${binFolder}
     rm -f geoip.dat geosite.dat geoip_IR.dat geosite_IR.dat geoip_VN.dat geosite_VN.dat
     wget -N https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
@@ -794,36 +800,36 @@ update_geo() {
     wget -O geosite_IR.dat -N https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
     wget -O geoip_VN.dat https://github.com/vuong2023/vn-v2ray-rules/releases/latest/download/geoip.dat
     wget -O geosite_VN.dat https://github.com/vuong2023/vn-v2ray-rules/releases/latest/download/geosite.dat
-    systemctl start x-ui
+    systemctl start zzz
     echo -e "${green}Geosite.dat + Geoip.dat + geoip_IR.dat + geosite_IR.dat 在 bin 文件夹: '${binfolder}' 中已经更新成功 !${plain}"
     before_show_menu
 }
 
-install_acme() { 
+install_acme() {
     # 检查是否已安装 acme.sh
-    if command -v ~/.acme.sh/acme.sh &>/dev/null; then 
-        LOGI "acme.sh 已经安装。" 
-        return 0 
-    fi 
- 
-    LOGI "正在安装 acme.sh..." 
+    if command -v ~/.acme.sh/acme.sh &>/dev/null; then
+        LOGI "acme.sh 已经安装。"
+        return 0
+    fi
+
+    LOGI "正在安装 acme.sh..."
     cd ~ || return 1 # 确保可以切换到主目录
- 
-    curl -s https://get.acme.sh | sh 
-    if [ $? -ne 0 ]; then 
-        LOGE "安装 acme.sh 失败。" 
-        return 1 
-    else 
-        LOGI "安装 acme.sh 成功。" 
-    fi 
- 
-    return 0 
+
+    curl -s https://get.acme.sh | sh
+    if [ $? -ne 0 ]; then
+        LOGE "安装 acme.sh 失败。"
+        return 1
+    else
+        LOGI "安装 acme.sh 成功。"
+    fi
+
+    return 0
 }
 
 # 【中文注释】：“备用方式申请证书”函数
 ssl_cert_issue_standalone_embedded() {
-    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}')
-    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}')
+    local existing_webBasePath=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}')
+    local existing_port=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}')
     echo ""
     echo -e "${yellow}=== 备用方式申请 SSL 证书 (Standalone 模式) ===${plain}"
     echo ""
@@ -943,50 +949,50 @@ ssl_cert_issue_standalone_embedded() {
 
     # --- 6. 申请证书 (Standalone 模式) ---
     LOGI "正在使用 Standalone 模式申请证书 (占用 80 端口)..."
-    # 如果 80 端口被 nginx 或 x-ui 占用，先尝试停止它们
+    # 如果 80 端口被 nginx 或 zzz 占用，先尝试停止它们
     systemctl stop nginx >/dev/null 2>&1
-    systemctl stop x-ui >/dev/null 2>&1
-    
+    systemctl stop zzz >/dev/null 2>&1
+
     if ! ~/.acme.sh/acme.sh --issue --standalone -d $DOMAIN --server $CA_SERVER --force; then
         LOGE "❌ 证书申请失败！"
         LOGE "请检查：1、域名解析是否正确指向本机 IP。2、80 端口是否开放且未被占用。"
-        # 失败尝试重启 x-ui
-        systemctl start x-ui >/dev/null 2>&1
+        # 失败尝试重启 zzz
+        systemctl start zzz >/dev/null 2>&1
         return 1
     fi
 
 # --- 7. 安装证书到标准路径 ---
-# 直接创建 x-ui 标准目录结构，
+# 直接创建 zzz 标准目录结构，
     local certPath="/root/cert/${DOMAIN}"
     if [ ! -d "$certPath" ]; then
         mkdir -p "$certPath"
     fi
-    
+
     LOGI "申请成功！正在安装证书到: $certPath"
-    
-    # x-ui 是系统服务，用 systemctl restart x-ui 更稳妥
-    local reloadCmd="systemctl restart x-ui" 
-    
+
+    # zzz 是系统服务，用 systemctl restart zzz 更稳妥
+    local reloadCmd="systemctl restart zzz"
+
     ~/.acme.sh/acme.sh --installcert -d $DOMAIN \
         --key-file       "${certPath}/privkey.pem" \
         --fullchain-file "${certPath}/fullchain.pem" \
         --reloadcmd      "${reloadCmd}"
-        
+
     if [ $? -eq 0 ]; then
         LOGI "✅ 证书安装命令执行成功！"
         # 启用 acme.sh 自动升级
         ~/.acme.sh/acme.sh --upgrade --auto-upgrade
-        
+
         # --- 8. 自动应用到面板设置 (包含文件检查) ---
         local webCertFile="${certPath}/fullchain.pem"
         local webKeyFile="${certPath}/privkey.pem"
-        
+
         # === 文件检查判断 ===
         if [[ -f "${webCertFile}" && -f "${webKeyFile}" && -s "${webCertFile}" && -s "${webKeyFile}" ]]; then
-            
+
             LOGI "检测到证书文件存在且有效，正在应用到 ZZZ Console..."
-            /usr/local/x-ui/x-ui cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
-            
+            /usr/local/zzz/zzz cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
+
             echo -e "${green}恭喜！备用方式证书申请并配置成功！${plain}"
             echo ""
             echo "  - 域名：$DOMAIN"
@@ -999,84 +1005,84 @@ ssl_cert_issue_standalone_embedded() {
             echo ""
             echo -e "${green}PS：若您要登录访问面板，请复制上面的地址到浏览器打开即可${plain}"
             echo ""
-            
+
             # 重启面板以生效
             if command -v restart >/dev/null 2>&1; then
                 restart
             else
-                systemctl restart x-ui
+                systemctl restart zzz
             fi
         else
             LOGE "❌ 严重错误：证书安装显示成功，但未找到证书文件或文件为空！"
             LOGE "请检查目录权限或磁盘空间：$certPath"
-            # 恢复 x-ui 运行，避免断联
-            systemctl start x-ui >/dev/null 2>&1
+            # 恢复 zzz 运行，避免断联
+            systemctl start zzz >/dev/null 2>&1
             return 1
         fi
     else
         LOGE "证书安装步骤失败，请检查日志。"
-        systemctl start x-ui >/dev/null 2>&1
+        systemctl start zzz >/dev/null 2>&1
     fi
 }
 
-ssl_cert_issue_main() { 
-    echo -e "${green}\t1.${plain} 获取 SSL 证书" 
-    echo -e "${green}\t2.${plain} 撤销证书" 
-    echo -e "${green}\t3.${plain} 强制更新证书" 
-    echo -e "${green}\t4.${plain} 自定义证书路径" 
-    echo -e "${green}\t5.${plain} 备用方式申请证书" 
-    echo -e "${green}\t6.${plain} 显示现有域名" 
-    echo -e "${green}\t7.${plain} 为面板设置证书路径" 
+ssl_cert_issue_main() {
+    echo -e "${green}\t1.${plain} 获取 SSL 证书"
+    echo -e "${green}\t2.${plain} 撤销证书"
+    echo -e "${green}\t3.${plain} 强制更新证书"
+    echo -e "${green}\t4.${plain} 自定义证书路径"
+    echo -e "${green}\t5.${plain} 备用方式申请证书"
+    echo -e "${green}\t6.${plain} 显示现有域名"
+    echo -e "${green}\t7.${plain} 为面板设置证书路径"
     echo -e "${green}\t0.${plain} 返回主菜单"
-    echo "" 
- 
-    read -rp "请选择一个选项：" choice 
-    case "$choice" in 
-    0) 
-        show_menu 
-        ;; 
-    1) 
-        ssl_cert_issue 
-        ssl_cert_issue_main 
-        ;; 
-    2) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
-        if [ -z "$domains" ]; then 
-            echo "未找到可撤销的证书。" 
-        else 
-            echo "现有域名：" 
-            echo "$domains" 
-            read -rp "请从列表中输入要撤销证书的域名：" domain 
-            if echo "$domains" | grep -qw "$domain"; then 
-                ~/.acme.sh/acme.sh --revoke -d ${domain} 
-                LOGI "已撤销域名的证书：$domain" 
-            else 
-                echo "输入的域名无效。" 
-            fi 
-        fi 
-        ssl_cert_issue_main 
-        ;; 
-    3) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
-        if [ -z "$domains" ]; then 
-            echo "未找到可更新的证书。" 
-        else 
-            echo "现有域名：" 
-            echo "$domains" 
-            read -rp "请从列表中输入要强制更新 SSL 证书的域名：" domain 
-            if echo "$domains" | grep -qw "$domain"; then 
-                ~/.acme.sh/acme.sh --renew -d ${domain} --force 
-                LOGI "已强制更新域名的证书：$domain" 
-            else 
-                echo "输入的域名无效。" 
-            fi 
-        fi 
-        ssl_cert_issue_main 
-        ;; 
-    4) 
+    echo ""
+
+    read -rp "请选择一个选项：" choice
+    case "$choice" in
+    0)
+        show_menu
+        ;;
+    1)
+        ssl_cert_issue
+        ssl_cert_issue_main
+        ;;
+    2)
+        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+        if [ -z "$domains" ]; then
+            echo "未找到可撤销的证书。"
+        else
+            echo "现有域名："
+            echo "$domains"
+            read -rp "请从列表中输入要撤销证书的域名：" domain
+            if echo "$domains" | grep -qw "$domain"; then
+                ~/.acme.sh/acme.sh --revoke -d ${domain}
+                LOGI "已撤销域名的证书：$domain"
+            else
+                echo "输入的域名无效。"
+            fi
+        fi
+        ssl_cert_issue_main
+        ;;
+    3)
+        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+        if [ -z "$domains" ]; then
+            echo "未找到可更新的证书。"
+        else
+            echo "现有域名："
+            echo "$domains"
+            read -rp "请从列表中输入要强制更新 SSL 证书的域名：" domain
+            if echo "$domains" | grep -qw "$domain"; then
+                ~/.acme.sh/acme.sh --renew -d ${domain} --force
+                LOGI "已强制更新域名的证书：$domain"
+            else
+                echo "输入的域名无效。"
+            fi
+        fi
+        ssl_cert_issue_main
+        ;;
+    4)
         # 【功能：自定义证书路径】
-        local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}')
-        local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}')
+        local existing_webBasePath=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}')
+        local existing_port=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}')
         echo ""
         echo -e "${yellow}您选择了“手动上传证书”去自定义路径${plain}"
         echo ""
@@ -1090,27 +1096,27 @@ ssl_cert_issue_main() {
 
         # 源文件检查，增加 -s 判断，防止用户上传了空文件
         if [[ -f "$user_cert" && -f "$user_key" && -s "$user_cert" && -s "$user_key" ]]; then
-            
+
             # 创建标准存放目录
             local certPath="/root/cert/${domain}"
             if [ ! -d "$certPath" ]; then
                 mkdir -p "$certPath"
             fi
-            
+
             # 复制文件到 ZZZ Console 标准目录，统一命名
             # 使用 \cp -f 强制覆盖，不提示
             \cp -f "$user_cert" "${certPath}/fullchain.pem"
             \cp -f "$user_key" "${certPath}/privkey.pem"
-            
+
             local webCertFile="${certPath}/fullchain.pem"
             local webKeyFile="${certPath}/privkey.pem"
 
             # 检查复制后的目标文件是否存在且不为空
             if [[ -f "${webCertFile}" && -f "${webKeyFile}" && -s "${webCertFile}" && -s "${webKeyFile}" ]]; then
-                
+
                 # 应用到面板设置
-                /usr/local/x-ui/x-ui cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
-                
+                /usr/local/zzz/zzz cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
+
                 echo -e "${green}已成功导入证书并设置应用到面板路径！${plain}"
                 echo ""
                 echo "  - 域名：$domain"
@@ -1123,7 +1129,7 @@ ssl_cert_issue_main() {
                 echo ""
                 echo -e "${green}PS：若您要登录访问面板，请复制上面的地址到浏览器打开即可${plain}"
                 echo ""
-                
+
                 # 只有文件确认无误，才执行重启
                 restart
             else
@@ -1138,7 +1144,7 @@ ssl_cert_issue_main() {
             echo ""
             echo "私钥路径: $user_key"
         fi
-        
+
         # 返回主菜单
         ssl_cert_issue_main
         ;;
@@ -1147,69 +1153,69 @@ ssl_cert_issue_main() {
         ssl_cert_issue_standalone_embedded
         ssl_cert_issue_main
         ;;
-    6) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
-        if [ -z "$domains" ]; then 
-            echo "未找到证书。" 
-        else 
-            echo "现有域名及其路径：" 
-            for domain in $domains; do 
-                local cert_path="/root/cert/${domain}/fullchain.pem" 
-                local key_path="/root/cert/${domain}/privkey.pem" 
-                if [[ -f "${cert_path}" && -f "${key_path}" ]]; then 
+    6)
+        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+        if [ -z "$domains" ]; then
+            echo "未找到证书。"
+        else
+            echo "现有域名及其路径："
+            for domain in $domains; do
+                local cert_path="/root/cert/${domain}/fullchain.pem"
+                local key_path="/root/cert/${domain}/privkey.pem"
+                if [[ -f "${cert_path}" && -f "${key_path}" ]]; then
                     echo -e "域名：${domain}"
-                    echo "" 
+                    echo ""
                     echo -e "\t证书路径：${cert_path}"
-                    echo "" 
-                    echo -e "\t私钥路径：${key_path}" 
-                else 
-                    echo -e "域名：${domain} - 证书或私钥文件缺失。" 
-                fi 
-            done 
-        fi 
-        ssl_cert_issue_main 
-        ;; 
-    7) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
-        if [ -z "$domains" ]; then 
-            echo "未找到证书。" 
-        else 
-            echo "可用域名：" 
-            echo "$domains" 
-            read -rp "请选择要为面板设置证书路径的域名：" domain 
- 
-            if echo "$domains" | grep -qw "$domain"; then 
-                local webCertFile="/root/cert/${domain}/fullchain.pem" 
-                local webKeyFile="/root/cert/${domain}/privkey.pem" 
- 
-                if [[ -f "${webCertFile}" && -f "${webKeyFile}" ]]; then 
-                    /usr/local/x-ui/x-ui cert -webCert "$webCertFile" -webCertKey "$webKeyFile" 
+                    echo ""
+                    echo -e "\t私钥路径：${key_path}"
+                else
+                    echo -e "域名：${domain} - 证书或私钥文件缺失。"
+                fi
+            done
+        fi
+        ssl_cert_issue_main
+        ;;
+    7)
+        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+        if [ -z "$domains" ]; then
+            echo "未找到证书。"
+        else
+            echo "可用域名："
+            echo "$domains"
+            read -rp "请选择要为面板设置证书路径的域名：" domain
+
+            if echo "$domains" | grep -qw "$domain"; then
+                local webCertFile="/root/cert/${domain}/fullchain.pem"
+                local webKeyFile="/root/cert/${domain}/privkey.pem"
+
+                if [[ -f "${webCertFile}" && -f "${webKeyFile}" ]]; then
+                    /usr/local/zzz/zzz cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
                     echo "已为域名设置面板证书路径：$domain"
-                    echo "" 
+                    echo ""
                     echo "  - 证书文件：$webCertFile"
-                    echo "" 
-                    echo "  - 私钥文件：$webKeyFile" 
-                    restart 
-                else 
-                    echo "未找到域名的证书或私钥：$domain" 
-                fi 
-            else 
-                echo "输入的域名无效。" 
-            fi 
-        fi 
-        ssl_cert_issue_main 
-        ;; 
- 
-    *) 
-        echo -e "${red}无效选项，请选择有效的数字。${plain}\n" 
-        ssl_cert_issue_main 
-        ;; 
-    esac 
+                    echo ""
+                    echo "  - 私钥文件：$webKeyFile"
+                    restart
+                else
+                    echo "未找到域名的证书或私钥：$domain"
+                fi
+            else
+                echo "输入的域名无效。"
+            fi
+        fi
+        ssl_cert_issue_main
+        ;;
+
+    *)
+        echo -e "${red}无效选项，请选择有效的数字。${plain}\n"
+        ssl_cert_issue_main
+        ;;
+    esac
 }
 
 ssl_cert_issue() {
-    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}')
-    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}')
+    local existing_webBasePath=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}')
+    local existing_port=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}')
     # 首先检查 acme.sh
     echo ""
     if ! command -v ~/.acme.sh/acme.sh &>/dev/null; then
@@ -1266,7 +1272,7 @@ ssl_cert_issue() {
     LOGD "正在获取本机公共 IP..."
     echo ""
     public_ip=$(curl -s4m8 http://ip.sb -k)
-    
+
     if [ -z "$public_ip" ]; then
         LOGE "获取本机公共 IP 失败，请检查网络连接！"
         exit 1
@@ -1347,9 +1353,9 @@ ssl_cert_issue() {
 
     # --- 自动设置 reloadCmd ---
     echo ""
-    reloadCmd="systemctl restart x-ui"
-    LOGI "ACME 的 --reloadcmd 已自动设置为: ${yellow}systemctl restart x-ui"
-    
+    reloadCmd="systemctl restart zzz"
+    LOGI "ACME 的 --reloadcmd 已自动设置为: ${yellow}systemctl restart zzz"
+
     # 安装证书
     echo ""
     ~/.acme.sh/acme.sh --installcert -d ${domain} \
@@ -1386,7 +1392,7 @@ ssl_cert_issue() {
     local webKeyFile="/root/cert/${domain}/privkey.pem"
 
     if [[ -f "$webCertFile" && -f "$webKeyFile" ]]; then
-        /usr/local/x-ui/x-ui cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
+        /usr/local/zzz/zzz cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
         LOGI "已为域名自动设置面板证书路径: $domain"
         echo ""
         LOGI "  - 证书文件: $webCertFile"
@@ -1404,8 +1410,8 @@ ssl_cert_issue() {
 }
 
 ssl_cert_issue_CF() {
-    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}')
-    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}')
+    local existing_webBasePath=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}')
+    local existing_port=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}')
     LOGI "****** 使用说明 ******"
     echo ""
     LOGI "请按照以下步骤完成操作："
@@ -1473,7 +1479,7 @@ ssl_cert_issue_CF() {
         else
             LOGI "证书颁发成功，正在安装..."
         fi
-        
+
         # 为证书创建一个目录
         echo ""
         certPath="/root/cert/${CF_Domain}"
@@ -1489,8 +1495,8 @@ ssl_cert_issue_CF() {
 
         # --- 自动设置 reloadCmd ---
         echo ""
-        reloadCmd="systemctl restart x-ui"
-        LOGI "ACME 的 --reloadcmd 已自动设置为: ${yellow}systemctl restart x-ui"
+        reloadCmd="systemctl restart zzz"
+        LOGI "ACME 的 --reloadcmd 已自动设置为: ${yellow}systemctl restart zzz"
         echo ""
 
         # 执行“安装证书”流程
@@ -1499,7 +1505,7 @@ ssl_cert_issue_CF() {
             --key-file ${certPath}/privkey.pem \
             --fullchain-file ${certPath}/fullchain.pem \
             --reloadcmd "${reloadCmd}"
-        
+
         echo ""
         if [ $? -ne 0 ]; then
             LOGE "证书安装失败，脚本正在退出..."
@@ -1526,7 +1532,7 @@ ssl_cert_issue_CF() {
         local webKeyFile="${certPath}/privkey.pem"
 
         if [[ -f "$webCertFile" && -f "$webKeyFile" ]]; then
-            /usr/local/x-ui/x-ui cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
+            /usr/local/zzz/zzz cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
             echo ""
             LOGI "已为域名自动设置面板证书路径: $CF_Domain"
             echo ""
@@ -1575,7 +1581,7 @@ warp_cloudflare() {
     esac
 }
 
-# --------- 【订阅转换】模块 ---------- 
+# --------- 【订阅转换】模块 ----------
 subconverter() {
 echo ""
 echo -e "${green}==============================================="
@@ -1588,8 +1594,8 @@ echo -e "5. 可直观在前端页面配置订阅"
 echo -e "作者：〔ZZZ Console〕专属定制"
 echo -e "===============================================${plain}"
 echo ""
-    local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
-    local existing_key=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'key: .+' | awk '{print $2}')
+    local existing_cert=$(/usr/local/zzz/zzz setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
+    local existing_key=$(/usr/local/zzz/zzz setting -getCert true | grep -Eo 'key: .+' | awk '{print $2}')
 
     if [[ -n "$existing_cert" && -n "$existing_key" ]]; then
     echo -e "${green}面板已安装证书采用SSL保护${plain}"
@@ -1683,7 +1689,7 @@ echo -e "${green}Web 界面访问地址：https://${domain}:15268${plain}"
 echo ""
 echo -e "${green}若要登录前端网页使用【订阅转换】，请直接复制以上地址${plain}"
 echo ""
-echo -e "${green}接下来流程会进入〔ZZZ Console〕x-ui 菜单项${plain}"
+echo -e "${green}接下来流程会进入〔ZZZ Console〕zzz 菜单项${plain}"
 sleep 8
 echo ""
 # --------- 返回菜单 ----------
@@ -2028,7 +2034,7 @@ iplimit_remove_conflicts() {
 }
 
 zzz_tools() {
-    local tool_script="/usr/local/x-ui/tools/kejilion/kejilion.sh"
+    local tool_script="/usr/local/zzz/tools/kejilion/kejilion.sh"
     if [[ ! -f "$tool_script" && -f "/app/tools/kejilion/kejilion.sh" ]]; then
         tool_script="/app/tools/kejilion/kejilion.sh"
     fi
@@ -2043,24 +2049,24 @@ zzz_tools() {
 show_usage() {
     echo -e "         ---------------------"
     echo -e "         |${green}ZZZ Console 控制菜单用法 ${plain}|${plain}"
-    echo -e "         |  ${yellow}一个更好的面板   ${plain}|${plain}"   
-    echo -e "         | ${yellow}基于Xray Core构建 ${plain}|${plain}"  
+    echo -e "         |  ${yellow}一个更好的面板   ${plain}|${plain}"
+    echo -e "         | ${yellow}基于Xray Core构建 ${plain}|${plain}"
     echo -e "--------------------------------------------"
-    echo -e "x-ui              - 进入管理脚本"
-    echo -e "x-ui start        - 启动 ZZZ Console"
-    echo -e "x-ui stop         - 关闭 ZZZ Console"
-    echo -e "x-ui restart      - 重启 ZZZ Console"
-    echo -e "x-ui status       - 查看 ZZZ Console 状态"
-    echo -e "x-ui settings     - 查看当前设置信息"
-    echo -e "x-ui enable       - 启用 ZZZ Console 开机启动"
-    echo -e "x-ui disable      - 禁用 ZZZ Console 开机启动"
-    echo -e "x-ui log          - 查看 ZZZ Console 运行日志"
-    echo -e "x-ui banlog       - 检查 Fail2ban 禁止日志"
-    echo -e "x-ui update       - 更新 ZZZ Console"
-    echo -e "x-ui custom       - 自定义 ZZZ Console 版本"
-    echo -e "x-ui install      - 安装 ZZZ Console"
-    echo -e "x-ui uninstall    - 卸载 ZZZ Console"
-    echo -e "x-ui tools        - 打开 ZZZ 服务器工具箱"
+    echo -e "zzz              - 进入管理脚本"
+    echo -e "zzz start        - 启动 ZZZ Console"
+    echo -e "zzz stop         - 关闭 ZZZ Console"
+    echo -e "zzz restart      - 重启 ZZZ Console"
+    echo -e "zzz status       - 查看 ZZZ Console 状态"
+    echo -e "zzz settings     - 查看当前设置信息"
+    echo -e "zzz enable       - 启用 ZZZ Console 开机启动"
+    echo -e "zzz disable      - 禁用 ZZZ Console 开机启动"
+    echo -e "zzz log          - 查看 ZZZ Console 运行日志"
+    echo -e "zzz banlog       - 检查 Fail2ban 禁止日志"
+    echo -e "zzz update       - 更新 ZZZ Console"
+    echo -e "zzz custom       - 自定义 ZZZ Console 版本"
+    echo -e "zzz install      - 安装 ZZZ Console"
+    echo -e "zzz uninstall    - 卸载 ZZZ Console"
+    echo -e "zzz tools        - 打开 ZZZ 服务器工具箱"
     echo -e "--------------------------------------------"
 }
 
@@ -2098,10 +2104,10 @@ show_menu() {
   ${green}20.${plain} IP 限制管理
   ${green}21.${plain} 防火墙管理
 ——————————————————————
-  ${green}22.${plain} 启用 BBR 
+  ${green}22.${plain} 启用 BBR
   ${green}23.${plain} 更新 Geo 文件
   ${green}24.${plain} Speedtest by Ookla
-  ${green}25.${plain} 安装订阅转换 
+  ${green}25.${plain} 安装订阅转换
   ${green}26.${plain} 服务器工具箱（完整建站功能）
 ——————————————————————
   ${green}ZZZ Console 项目地址${plain}

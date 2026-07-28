@@ -5,18 +5,18 @@ import (
 	"text/template"
 	"time"
 
-	"x-ui/logger"
-	"x-ui/web/service"
-	"x-ui/web/session"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/web/service"
+	"github.com/onlythezzz5-spec/zzz-console/web/session"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
 type LoginForm struct {
-	Username    	string `json:"username" form:"username"`
-	Password    	string `json:"password" form:"password"`
-	TwoFactorCode	string `json:"twoFactorCode" form:"twoFactorCode"`
+	Username      string `json:"username" form:"username"`
+	Password      string `json:"password" form:"password"`
+	TwoFactorCode string `json:"twoFactorCode" form:"twoFactorCode"`
 }
 
 type IndexController struct {

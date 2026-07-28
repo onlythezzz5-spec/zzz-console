@@ -1,12 +1,12 @@
 package controller
 
 import (
-	"x-ui/web/service"
+	"github.com/onlythezzz5-spec/zzz-console/web/service"
 
 	"github.com/gin-gonic/gin"
 )
 
-type XUIController struct {
+type ZZZController struct {
 	BaseController
 
 	inboundController     *InboundController
@@ -16,13 +16,13 @@ type XUIController struct {
 	serverService         service.ServerService
 }
 
-func NewXUIController(g *gin.RouterGroup) *XUIController {
-	a := &XUIController{}
+func NewZZZController(g *gin.RouterGroup) *ZZZController {
+	a := &ZZZController{}
 	a.initRouter(g)
 	return a
 }
 
-func (a *XUIController) initRouter(g *gin.RouterGroup) {
+func (a *ZZZController) initRouter(g *gin.RouterGroup) {
 	g = g.Group("/panel")
 	g.Use(a.checkLogin)
 
@@ -39,26 +39,26 @@ func (a *XUIController) initRouter(g *gin.RouterGroup) {
 	a.xraySettingController = NewXraySettingController(g)
 }
 
-func (a *XUIController) index(c *gin.Context) {
+func (a *ZZZController) index(c *gin.Context) {
 	html(c, "index.html", "pages.index.title", nil)
 }
 
-func (a *XUIController) inbounds(c *gin.Context) {
+func (a *ZZZController) inbounds(c *gin.Context) {
 	html(c, "inbounds.html", "pages.inbounds.title", nil)
 }
 
-func (a *XUIController) settings(c *gin.Context) {
+func (a *ZZZController) settings(c *gin.Context) {
 	html(c, "settings.html", "pages.settings.title", nil)
 }
 
-func (a *XUIController) xraySettings(c *gin.Context) {
+func (a *ZZZController) xraySettings(c *gin.Context) {
 	html(c, "xray.html", "pages.xray.title", nil)
 }
 
-func (a *XUIController) tools(c *gin.Context) {
+func (a *ZZZController) tools(c *gin.Context) {
 	html(c, "tools.html", "pages.index.title", nil)
 }
 
-func (a *XUIController) navigation(c *gin.Context) {
+func (a *ZZZController) navigation(c *gin.Context) {
 	html(c, "navigation.html", "pages.navigation.title", nil)
 }

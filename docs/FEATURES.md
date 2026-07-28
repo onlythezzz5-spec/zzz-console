@@ -135,7 +135,7 @@ Web 控制台可以快速生成：
 通过以下命令进入：
 
 ```bash
-x-ui tools
+zzz tools
 ```
 
 覆盖：

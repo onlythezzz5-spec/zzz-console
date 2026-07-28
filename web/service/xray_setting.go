@@ -4,8 +4,8 @@ import (
 	_ "embed"
 	"encoding/json"
 
-	"x-ui/util/common"
-	"x-ui/xray"
+	"github.com/onlythezzz5-spec/zzz-console/util/common"
+	"github.com/onlythezzz5-spec/zzz-console/xray"
 )
 
 type XraySettingService struct {

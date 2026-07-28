@@ -6,7 +6,7 @@
 [![Build](https://img.shields.io/github/actions/workflow/status/onlythezzz5-spec/zzz-console/release.yml?style=flat-square&label=build)](https://github.com/onlythezzz5-spec/zzz-console/actions/workflows/release.yml)
 [![License](https://img.shields.io/github/license/onlythezzz5-spec/zzz-console?style=flat-square)](LICENSE)
 
-ZZZ Console 把代理面板、入站与用户管理、订阅、流量统计、证书、防火墙、备份、Telegram 管理和 Linux 建站工具放进同一套部署中。安装后既可以在浏览器管理，也可以通过 `x-ui` 终端菜单维护服务器。
+ZZZ Console 把代理面板、入站与用户管理、订阅、流量统计、证书、防火墙、备份、Telegram 管理和 Linux 建站工具放进同一套部署中。安装后既可以在浏览器管理，也可以通过 `zzz` 终端菜单维护服务器。
 
 ## 一键安装
 
@@ -33,7 +33,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/onlythezzz5-spec/zzz-console/m
 安装结束会打印登录信息。忘记信息时执行：
 
 ```bash
-x-ui settings
+zzz settings
 ```
 
 ## 第一次使用
@@ -41,7 +41,7 @@ x-ui settings
 ### 1. 先打开面板端口
 
 ```bash
-x-ui
+zzz
 ```
 
 选择：
@@ -57,7 +57,7 @@ x-ui
 先把域名的 `A` 记录指向服务器公网 IPv4，然后执行：
 
 ```bash
-x-ui
+zzz
 ```
 
 选择：
@@ -125,7 +125,7 @@ https://你的域名:面板端口/访问路径/
 ### 服务器工具箱
 
 ```bash
-x-ui tools
+zzz tools
 ```
 
 包含：
@@ -140,16 +140,16 @@ x-ui tools
 ## 常用命令
 
 ```bash
-x-ui                 # 打开管理菜单
-x-ui start           # 启动
-x-ui stop            # 停止
-x-ui restart         # 重启
-x-ui status          # 查看状态
-x-ui settings        # 查看登录信息
-x-ui log             # 查看日志
-x-ui update          # 更新
-x-ui tools           # 服务器工具箱
-x-ui uninstall       # 卸载
+zzz                 # 打开管理菜单
+zzz start           # 启动
+zzz stop            # 停止
+zzz restart         # 重启
+zzz status          # 查看状态
+zzz settings        # 查看登录信息
+zzz log             # 查看日志
+zzz update          # 更新
+zzz tools           # 服务器工具箱
+zzz uninstall       # 卸载
 ```
 
 ## 文档

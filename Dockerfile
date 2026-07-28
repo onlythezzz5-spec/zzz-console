@@ -15,7 +15,7 @@ COPY . .
 
 ENV CGO_ENABLED=1
 ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
-RUN go build -ldflags "-w -s" -o build/x-ui main.go
+RUN go build -ldflags "-w -s" -o build/zzz main.go
 RUN ./DockerInit.sh "$TARGETARCH"
 
 # ========================================================
@@ -34,7 +34,7 @@ RUN apk add --no-cache --update \
 COPY --from=builder /app/build/ /app/
 COPY --from=builder /app/DockerEntrypoint.sh /app/
 COPY --from=builder /app/tools /app/tools
-COPY --from=builder /app/x-ui.sh /usr/bin/x-ui
+COPY --from=builder /app/zzz.sh /usr/bin/zzz
 
 
 # Configure fail2ban
@@ -46,10 +46,10 @@ RUN rm -f /etc/fail2ban/jail.d/alpine-ssh.conf \
 
 RUN chmod +x \
   /app/DockerEntrypoint.sh \
-  /app/x-ui \
-  /usr/bin/x-ui
+  /app/zzz \
+  /usr/bin/zzz
 
-ENV XUI_ENABLE_FAIL2BAN="true"
-VOLUME [ "/etc/x-ui" ]
-CMD [ "./x-ui" ]
+ENV ZZZ_ENABLE_FAIL2BAN="true"
+VOLUME [ "/etc/zzz" ]
+CMD [ "./zzz" ]
 ENTRYPOINT [ "/app/DockerEntrypoint.sh" ]

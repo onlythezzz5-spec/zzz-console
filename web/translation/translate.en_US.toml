@@ -333,7 +333,7 @@
 "modalContent" = "We are about to detect and redirect you to your subscription conversion service page. Do you want to continue?"
 "modalOk" = "continue"
 "notFoundTitle" = "[Subscription Conversion Service] is not installed or cannot be accessed"
-"notFoundContent" = "Please enter the VPS server terminal, enter the x-ui command, and select option [25] to install."
+"notFoundContent" = "Please enter the VPS server terminal, run the zzz command, and select option [25] to install."
 
 [pages.settings]
 "title" = "Panel Settings"

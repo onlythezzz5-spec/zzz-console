@@ -1,7 +1,7 @@
 package job
 
 import (
-	"x-ui/web/service"
+	"github.com/onlythezzz5-spec/zzz-console/web/service"
 )
 
 type CheckHashStorageJob struct {

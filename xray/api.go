@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"time"
-	"math"
 
-	"x-ui/logger"
-	"x-ui/util/common"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/util/common"
 
 	"github.com/xtls/xray-core/app/proxyman/command"
 	statsService "github.com/xtls/xray-core/app/stats/command"
@@ -180,7 +180,7 @@ func (x *XrayAPI) AddUser(Protocol string, inboundTag string, user map[string]an
 			},
 		}),
 	})
-	
+
 	// 〔中文注释〕: (修改点) 增加更详细的错误日志，方便排查问题。
 	if err != nil {
 		emailStr, _ := user["email"].(string)

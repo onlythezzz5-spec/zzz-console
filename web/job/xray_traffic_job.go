@@ -2,9 +2,9 @@ package job
 
 import (
 	"encoding/json"
-	"x-ui/logger"
-	"x-ui/web/service"
-	"x-ui/xray"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/web/service"
+	"github.com/onlythezzz5-spec/zzz-console/xray"
 
 	"github.com/valyala/fasthttp"
 )

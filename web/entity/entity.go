@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"x-ui/util/common"
+	"github.com/onlythezzz5-spec/zzz-console/util/common"
 )
 
 type Msg struct {

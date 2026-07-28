@@ -4,10 +4,10 @@ import (
 	"errors"
 	"time"
 
-	"x-ui/util/crypto"
-	"x-ui/web/entity"
-	"x-ui/web/service"
-	"x-ui/web/session"
+	"github.com/onlythezzz5-spec/zzz-console/util/crypto"
+	"github.com/onlythezzz5-spec/zzz-console/web/entity"
+	"github.com/onlythezzz5-spec/zzz-console/web/service"
+	"github.com/onlythezzz5-spec/zzz-console/web/session"
 
 	"github.com/gin-gonic/gin"
 )

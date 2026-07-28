@@ -22,7 +22,7 @@ func init() {
 }
 
 func InitLogger(level logging.Level) {
-	newLogger := logging.MustGetLogger("x-ui")
+	newLogger := logging.MustGetLogger("zzz")
 	var err error
 	var backend logging.Backend
 	var format logging.Formatter
@@ -30,7 +30,6 @@ func InitLogger(level logging.Level) {
 
 	backend, err = logging.NewSyslogBackend("")
 	if err != nil {
-		println(err)
 		backend = logging.NewLogBackend(os.Stderr, "", 0)
 	}
 	if ppid > 0 && err != nil {
@@ -41,7 +40,7 @@ func InitLogger(level logging.Level) {
 
 	backendFormatter := logging.NewBackendFormatter(backend, format)
 	backendLeveled := logging.AddModuleLevel(backendFormatter)
-	backendLeveled.SetLevel(level, "x-ui")
+	backendLeveled.SetLevel(level, "zzz")
 	newLogger.SetBackend(backendLeveled)
 
 	logger = newLogger

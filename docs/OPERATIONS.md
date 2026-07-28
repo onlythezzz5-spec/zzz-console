@@ -3,26 +3,26 @@
 ## 服务命令
 
 ```bash
-x-ui start
-x-ui stop
-x-ui restart
-x-ui status
-x-ui log
+zzz start
+zzz stop
+zzz restart
+zzz status
+zzz log
 ```
 
 systemd 原生命令：
 
 ```bash
-systemctl status x-ui
-journalctl -u x-ui -n 200 --no-pager
-systemctl restart x-ui
+systemctl status zzz
+journalctl -u zzz -n 200 --no-pager
+systemctl restart zzz
 ```
 
 ## 查看和修改设置
 
 ```bash
-x-ui settings
-x-ui
+zzz settings
+zzz
 ```
 
 终端菜单可以：
@@ -41,7 +41,7 @@ x-ui
 
 ```bash
 install -d -m 700 /root/zzz-console-backup
-cp -a /etc/x-ui/x-ui.db /root/zzz-console-backup/x-ui-$(date +%F-%H%M%S).db
+cp -a /etc/zzz/zzz.db /root/zzz-console-backup/zzz-$(date +%F-%H%M%S).db
 ```
 
 证书通常保存在：
@@ -53,7 +53,7 @@ cp -a /etc/x-ui/x-ui.db /root/zzz-console-backup/x-ui-$(date +%F-%H%M%S).db
 完整迁移至少备份：
 
 ```text
-/etc/x-ui/x-ui.db
+/etc/zzz/zzz.db
 /root/cert/
 ```
 
@@ -64,17 +64,17 @@ cp -a /etc/x-ui/x-ui.db /root/zzz-console-backup/x-ui-$(date +%F-%H%M%S).db
 手动恢复前停止服务：
 
 ```bash
-systemctl stop x-ui
-cp /root/zzz-console-backup/你的备份.db /etc/x-ui/x-ui.db
-chown root:root /etc/x-ui/x-ui.db
-chmod 600 /etc/x-ui/x-ui.db
-systemctl start x-ui
+systemctl stop zzz
+cp /root/zzz-console-backup/你的备份.db /etc/zzz/zzz.db
+chown root:root /etc/zzz/zzz.db
+chmod 600 /etc/zzz/zzz.db
+systemctl start zzz
 ```
 
 ## 更新
 
 ```bash
-x-ui update
+zzz update
 ```
 
 更新顺序：
@@ -82,13 +82,13 @@ x-ui update
 1. 导出数据库
 2. 记录当前版本与登录地址
 3. 执行更新
-4. 检查 `x-ui status`
+4. 检查 `zzz status`
 5. 登录面板检查入站和订阅
 
 ## 证书续期
 
 ```bash
-x-ui
+zzz
 ```
 
 进入 `18. SSL 证书管理`，可查看、强制更新、撤销或重新设置证书路径。
@@ -98,13 +98,13 @@ x-ui
 面板日志：
 
 ```bash
-x-ui log
+zzz log
 ```
 
 systemd 日志：
 
 ```bash
-journalctl -u x-ui -f
+journalctl -u zzz -f
 ```
 
 Xray 访问日志和错误日志也可以直接在仪表盘查看并筛选。
@@ -112,7 +112,7 @@ Xray 访问日志和错误日志也可以直接在仪表盘查看并筛选。
 ## 服务器工具箱
 
 ```bash
-x-ui tools
+zzz tools
 ```
 
 工具箱独立于面板数据库。执行系统、建站、Docker、证书或迁移操作前，先完成对应数据备份。

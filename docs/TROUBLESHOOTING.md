@@ -16,10 +16,10 @@ curl -I https://raw.githubusercontent.com
 依次执行：
 
 ```bash
-x-ui status
-x-ui settings
-systemctl status x-ui --no-pager
-journalctl -u x-ui -n 100 --no-pager
+zzz status
+zzz settings
+systemctl status zzz --no-pager
+journalctl -u zzz -n 100 --no-pager
 ss -lntp
 ufw status
 ```
@@ -36,13 +36,13 @@ ufw status
 ## 忘记用户名、密码或访问路径
 
 ```bash
-x-ui settings
+zzz settings
 ```
 
 需要重置时：
 
 ```bash
-x-ui
+zzz
 ```
 
 使用菜单 `6`、`7`、`9`。
@@ -78,7 +78,7 @@ ufw status
 ```bash
 ss -lntup
 ufw status
-x-ui log
+zzz log
 ```
 
 同时查看面板首页的 Xray 错误日志。
@@ -88,7 +88,7 @@ x-ui log
 先在面板的 **Xray 设置** 检查配置，再查看：
 
 ```bash
-journalctl -u x-ui -n 200 --no-pager
+journalctl -u zzz -n 200 --no-pager
 ```
 
 常见原因：
@@ -101,8 +101,8 @@ journalctl -u x-ui -n 200 --no-pager
 ## 更新后异常
 
 ```bash
-x-ui status
-x-ui log
+zzz status
+zzz log
 ```
 
-如果数据库结构或配置异常，导入更新前导出的 `x-ui.db`。恢复前先备份当前故障数据库，避免覆盖唯一证据。
+如果数据库结构或配置异常，导入更新前导出的 `zzz.db`。恢复前先备份当前故障数据库，避免覆盖唯一证据。

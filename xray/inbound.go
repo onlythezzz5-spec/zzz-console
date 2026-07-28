@@ -3,7 +3,7 @@ package xray
 import (
 	"bytes"
 
-	"x-ui/util/json_util"
+	"github.com/onlythezzz5-spec/zzz-console/util/json_util"
 )
 
 type InboundConfig struct {

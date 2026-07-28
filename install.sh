@@ -72,23 +72,28 @@ install_free_version() {
     echo -e "${yellow}---------->>>>>当前系统的架构为: $(arch)${plain}"
     echo ""
     last_version=$(curl -Ls "https://api.github.com/repos/onlythezzz5-spec/zzz-console/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    # 获取 x-ui 版本
-    xui_version=$(/usr/local/x-ui/x-ui -v)
+    # 同时识别当前 ZZZ Console 和旧版安装，便于原地升级。
+    current_binary=""
+    if [[ -x /usr/local/zzz/zzz ]]; then
+        current_binary="/usr/local/zzz/zzz"
+    elif [[ -x /usr/local/x-ui/x-ui ]]; then
+        current_binary="/usr/local/x-ui/x-ui"
+    fi
+    zzz_version=$([[ -n "$current_binary" ]] && "$current_binary" -v 2>/dev/null)
 
-    # 检查 xui_version 是否为空
-    if [[ -z "$xui_version" ]]; then
+    if [[ -z "$zzz_version" ]]; then
         echo ""
-        echo -e "${red}------>>>当前服务器没有安装任何 x-ui 系列代理面板${plain}"
+        echo -e "${red}------>>>当前服务器没有安装 ZZZ Console${plain}"
         echo ""
         echo -e "${green}-------->>>>片刻之后脚本将会自动引导安装〔ZZZ Console〕${plain}"
     else
         # 检查版本号中是否包含冒号
-        if [[ "$xui_version" == *:* ]]; then
-            echo -e "${green}---------->>>>>当前代理面板的版本为: ${red}其他 x-ui 分支版本${plain}"
+        if [[ "$zzz_version" == *:* ]]; then
+            echo -e "${green}---------->>>>>检测到可迁移的旧版面板${plain}"
             echo ""
             echo -e "${green}-------->>>>片刻之后脚本将会自动引导安装〔ZZZ Console〕${plain}"
         else
-            echo -e "${green}---------->>>>>当前代理面板的版本为: ${red}〔ZZZ Console〕v${xui_version}${plain}"
+            echo -e "${green}---------->>>>>当前代理面板的版本为: ${red}〔ZZZ Console〕v${zzz_version}${plain}"
         fi
     fi
     echo ""
@@ -186,7 +191,7 @@ install_free_version() {
         echo "$random_string"
     }
 
-    # This function will be called when user installed x-ui out of security
+    # This function will be called when user installed zzz out of security
     config_after_install() {
         echo -e "${yellow}安装/更新完成！ 为了您的面板安全，建议修改面板设置 ${plain}"
         echo ""
@@ -201,11 +206,11 @@ install_free_version() {
             read -p "请设置面板登录访问路径: " config_webBasePath
             echo -e "${yellow}您的面板访问路径为: ${config_webBasePath}${plain}"
             echo -e "${yellow}正在初始化，请稍候...${plain}"
-            /usr/local/x-ui/x-ui setting -username ${config_account} -password ${config_password}
+            /usr/local/zzz/zzz setting -username ${config_account} -password ${config_password}
             echo -e "${yellow}用户名和密码设置成功!${plain}"
-            /usr/local/x-ui/x-ui setting -port ${config_port}
+            /usr/local/zzz/zzz setting -port ${config_port}
             echo -e "${yellow}面板端口号设置成功!${plain}"
-            /usr/local/x-ui/x-ui setting -webBasePath ${config_webBasePath}
+            /usr/local/zzz/zzz setting -webBasePath ${config_webBasePath}
             echo -e "${yellow}面板登录访问路径设置成功!${plain}"
             echo ""
         else
@@ -213,11 +218,11 @@ install_free_version() {
             sleep 1
             echo -e "${red}--------------->>>>Cancel...--------------->>>>>>>取消修改...${plain}"
             echo ""
-            if [[ ! -f "/etc/x-ui/x-ui.db" ]]; then
+            if [[ ! -f "/etc/zzz/zzz.db" ]]; then
                 local usernameTemp=$(head -c 10 /dev/urandom | base64)
                 local passwordTemp=$(head -c 10 /dev/urandom | base64)
                 local webBasePathTemp=$(gen_random_string 15)
-                /usr/local/x-ui/x-ui setting -username ${usernameTemp} -password ${passwordTemp} -webBasePath ${webBasePathTemp}
+                /usr/local/zzz/zzz setting -username ${usernameTemp} -password ${passwordTemp} -webBasePath ${webBasePathTemp}
                 echo ""
                 echo -e "${yellow}检测到为全新安装，出于安全考虑将生成随机登录信息:${plain}"
                 echo -e "###############################################"
@@ -225,11 +230,11 @@ install_free_version() {
                 echo -e "${green}密  码: ${passwordTemp}${plain}"
                 echo -e "${green}访问路径: ${webBasePathTemp}${plain}"
                 echo -e "###############################################"
-                echo -e "${green}如果您忘记了登录信息，可以在安装后通过 x-ui 命令然后输入${red}数字 10 选项${green}进行查看${plain}"
+                echo -e "${green}如果您忘记了登录信息，可以在安装后通过 zzz 命令然后输入${red}数字 10 选项${green}进行查看${plain}"
             else
                 echo -e "${green}此次操作属于版本升级，保留之前旧设置项，登录方式保持不变${plain}"
                 echo ""
-                echo -e "${green}如果您忘记了登录信息，您可以通过 x-ui 命令然后输入${red}数字 10 选项${green}进行查看${plain}"
+                echo -e "${green}如果您忘记了登录信息，您可以通过 zzz 命令然后输入${red}数字 10 选项${green}进行查看${plain}"
                 echo ""
                 echo ""
             fi
@@ -237,11 +242,11 @@ install_free_version() {
         sleep 1
         echo -e ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
         echo ""
-        /usr/local/x-ui/x-ui migrate
+        /usr/local/zzz/zzz migrate
     }
 
     echo ""
-    install_x-ui() {
+    install_zzz() {
         cd /usr/local/
 
         # Download resources
@@ -263,14 +268,14 @@ install_free_version() {
             echo -e "${green}---------------->>>>>>>>>>>>>>>>>>>>>安装进度100%${plain}"
             echo ""
             sleep 2
-            wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(arch).tar.gz https://github.com/onlythezzz5-spec/zzz-console/releases/download/${last_version}/x-ui-linux-$(arch).tar.gz
+            wget -N --no-check-certificate -O /usr/local/zzz-linux-$(arch).tar.gz https://github.com/onlythezzz5-spec/zzz-console/releases/download/${last_version}/zzz-linux-$(arch).tar.gz
             if [[ $? -ne 0 ]]; then
                 echo -e "${red}下载 ZZZ Console 失败, 请检查服务器是否可以连接至 GitHub？ ${plain}"
                 exit 1
             fi
         else
             last_version=$1
-            url="https://github.com/onlythezzz5-spec/zzz-console/releases/download/${last_version}/x-ui-linux-$(arch).tar.gz"
+            url="https://github.com/onlythezzz5-spec/zzz-console/releases/download/${last_version}/zzz-linux-$(arch).tar.gz"
             echo ""
             echo -e "--------------------------------------------"
             echo -e "${green}---------------->>>>开始安装 ZZZ Console$1${plain}"
@@ -283,29 +288,35 @@ install_free_version() {
             echo -e "${green}---------------->>>>>>>>>>>>>>>>>>>>>安装进度100%${plain}"
             echo ""
             sleep 2
-            wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(arch).tar.gz ${url}
+            wget -N --no-check-certificate -O /usr/local/zzz-linux-$(arch).tar.gz ${url}
             if [[ $? -ne 0 ]]; then
                 echo -e "${red}下载 ZZZ Console $1 失败, 请检查此版本是否存在 ${plain}"
                 exit 1
             fi
         fi
-        wget -O /usr/bin/x-ui-temp https://raw.githubusercontent.com/onlythezzz5-spec/zzz-console/main/x-ui.sh
+        wget -O /usr/bin/zzz-temp https://raw.githubusercontent.com/onlythezzz5-spec/zzz-console/main/zzz.sh
 
-        # Stop x-ui service and remove old resources
-        if [[ -e /usr/local/x-ui/ ]]; then
-            systemctl stop x-ui
-            rm /usr/local/x-ui/ -rf
+        # 停止新旧服务并迁移旧数据库；原数据库保留不删除。
+        systemctl stop zzz >/dev/null 2>&1 || true
+        systemctl stop x-ui >/dev/null 2>&1 || true
+        mkdir -p /etc/zzz
+        chmod 750 /etc/zzz
+        if [[ ! -f /etc/zzz/zzz.db && -f /etc/x-ui/x-ui.db ]]; then
+            cp -a /etc/x-ui/x-ui.db /etc/zzz/zzz.db
+            chmod 600 /etc/zzz/zzz.db
+            echo -e "${green}已将旧版数据库迁移到 /etc/zzz/zzz.db${plain}"
         fi
-        
+        rm -rf /usr/local/zzz
+
         sleep 3
         echo -e "${green}------->>>>>>>>>>>检查并保存安装目录${plain}"
         echo ""
-        tar zxvf x-ui-linux-$(arch).tar.gz
-        rm x-ui-linux-$(arch).tar.gz -f
-        
-        cd x-ui
-        chmod +x x-ui
-        chmod +x x-ui.sh
+        tar zxvf zzz-linux-$(arch).tar.gz
+        rm zzz-linux-$(arch).tar.gz -f
+
+        cd zzz
+        chmod +x zzz
+        chmod +x zzz.sh
         if [[ -f tools/kejilion/kejilion.sh ]]; then
             chmod +x tools/kejilion/kejilion.sh
         fi
@@ -315,11 +326,13 @@ install_free_version() {
             mv bin/xray-linux-$(arch) bin/xray-linux-arm
             chmod +x bin/xray-linux-arm
         fi
-        chmod +x x-ui bin/xray-linux-$(arch)
+        chmod +x zzz bin/xray-linux-$(arch)
 
-        # Update x-ui cli and se set permission
-        mv -f /usr/bin/x-ui-temp /usr/bin/x-ui
-        chmod +x /usr/bin/x-ui
+        # Update zzz cli and se set permission
+        mv -f /usr/bin/zzz-temp /usr/bin/zzz
+        chmod +x /usr/bin/zzz
+        # 仅保留旧命令兼容入口；所有文档和新操作统一使用 zzz。
+        ln -sfn /usr/bin/zzz /usr/bin/x-ui
         sleep 2
         echo -e "${green}------->>>>>>>>>>>保存成功${plain}"
         sleep 2
@@ -330,15 +343,15 @@ install_free_version() {
         # 获取 IPv4 和 IPv6 地址
         v4=$(curl -s4m8 http://ip.sb -k)
         v6=$(curl -s6m8 http://ip.sb -k)
-        local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}') 
-        local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}') 
-        local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
-        local existing_key=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'key: .+' | awk '{print $2}')
+        local existing_webBasePath=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}')
+        local existing_port=$(/usr/local/zzz/zzz setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}')
+        local existing_cert=$(/usr/local/zzz/zzz setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
+        local existing_key=$(/usr/local/zzz/zzz setting -getCert true | grep -Eo 'key: .+' | awk '{print $2}')
 
         if [[ -n "$existing_cert" && -n "$existing_key" ]]; then
             echo -e "${green}面板已安装证书采用SSL保护${plain}"
             echo ""
-            local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
+            local existing_cert=$(/usr/local/zzz/zzz setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
             domain=$(basename "$(dirname "$existing_cert")")
             echo -e "${green}登录访问面板URL: https://${domain}:${existing_port}${green}${existing_webBasePath}${plain}"
         fi
@@ -387,10 +400,13 @@ install_free_version() {
     # 执行ssh端口转发
     ssh_forwarding
 
-        cp -f x-ui.service /etc/systemd/system/
+        cp -f zzz.service /etc/systemd/system/
+        systemctl disable x-ui >/dev/null 2>&1 || true
+        rm -f /etc/systemd/system/x-ui.service
         systemctl daemon-reload
-        systemctl enable x-ui
-        systemctl start x-ui
+        systemctl enable zzz
+        systemctl start zzz
+        rm -rf /usr/local/x-ui
         systemctl stop warp-go >/dev/null 2>&1
         wg-quick down wgcf >/dev/null 2>&1
         ipv4=$(curl -s4m8 ip.p3terx.com -k | sed -n 1p)
@@ -404,23 +420,23 @@ install_free_version() {
         echo ""
         echo -e "         ---------------------"
         echo -e "         |${green}ZZZ Console 控制菜单用法 ${plain}|${plain}"
-        echo -e "         |  ${yellow}一个更好的面板   ${plain}|${plain}"   
-        echo -e "         | ${yellow}基于Xray Core构建 ${plain}|${plain}"  
+        echo -e "         |  ${yellow}一个更好的面板   ${plain}|${plain}"
+        echo -e "         | ${yellow}基于Xray Core构建 ${plain}|${plain}"
         echo -e "--------------------------------------------"
-        echo -e "x-ui              - 进入管理脚本"
-        echo -e "x-ui start        - 启动 ZZZ Console"
-        echo -e "x-ui stop         - 关闭 ZZZ Console"
-        echo -e "x-ui restart      - 重启 ZZZ Console"
-        echo -e "x-ui status       - 查看 ZZZ Console 状态"
-        echo -e "x-ui settings     - 查看当前设置信息"
-        echo -e "x-ui enable       - 启用 ZZZ Console 开机启动"
-        echo -e "x-ui disable      - 禁用 ZZZ Console 开机启动"
-        echo -e "x-ui log          - 查看 ZZZ Console 运行日志"
-        echo -e "x-ui banlog       - 检查 Fail2ban 禁止日志"
-        echo -e "x-ui update       - 更新 ZZZ Console"
-        echo -e "x-ui custom       - 自定义 ZZZ Console 版本"
-        echo -e "x-ui install      - 安装 ZZZ Console"
-        echo -e "x-ui uninstall    - 卸载 ZZZ Console"
+        echo -e "zzz              - 进入管理脚本"
+        echo -e "zzz start        - 启动 ZZZ Console"
+        echo -e "zzz stop         - 关闭 ZZZ Console"
+        echo -e "zzz restart      - 重启 ZZZ Console"
+        echo -e "zzz status       - 查看 ZZZ Console 状态"
+        echo -e "zzz settings     - 查看当前设置信息"
+        echo -e "zzz enable       - 启用 ZZZ Console 开机启动"
+        echo -e "zzz disable      - 禁用 ZZZ Console 开机启动"
+        echo -e "zzz log          - 查看 ZZZ Console 运行日志"
+        echo -e "zzz banlog       - 检查 Fail2ban 禁止日志"
+        echo -e "zzz update       - 更新 ZZZ Console"
+        echo -e "zzz custom       - 自定义 ZZZ Console 版本"
+        echo -e "zzz install      - 安装 ZZZ Console"
+        echo -e "zzz uninstall    - 卸载 ZZZ Console"
         echo -e "--------------------------------------------"
         echo ""
         # if [[ -n $ipv4 ]]; then
@@ -440,22 +456,22 @@ install_free_version() {
     sudo timedatectl set-timezone Asia/Shanghai
 
     install_base
-    install_x-ui $1
+    install_zzz $1
     echo ""
     echo -e "----------------------------------------------"
     sleep 4
-    info=$(/usr/local/x-ui/x-ui setting -show true)
+    info=$(/usr/local/zzz/zzz setting -show true)
     echo -e "${info}${plain}"
     echo ""
-    echo -e "若您忘记了上述面板信息，后期可通过x-ui命令进入脚本${red}输入数字〔10〕选项获取${plain}"
+    echo -e "若您忘记了上述面板信息，后期可通过zzz命令进入脚本${red}输入数字〔10〕选项获取${plain}"
     echo ""
     echo -e "----------------------------------------------"
     echo ""
     sleep 2
     echo -e "${green}ZZZ Console 安装/更新完成${plain}"
-    echo -e "${green}〔ZZZ Console〕项目地址：${yellow}https://github.com/onlythezzz5-spec/zzz-console${plain}" 
+    echo -e "${green}〔ZZZ Console〕项目地址：${yellow}https://github.com/onlythezzz5-spec/zzz-console${plain}"
     echo ""
-    echo -e "${green}服务器工具箱：${yellow}x-ui tools${plain}"
+    echo -e "${green}服务器工具箱：${yellow}zzz tools${plain}"
     echo ""
     echo -e "----------------------------------------------"
     echo ""

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"x-ui/logger"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
 )
 
 func NewErrorf(format string, a ...any) error {

@@ -3,10 +3,10 @@ package service
 import (
 	"errors"
 
-	"x-ui/database"
-	"x-ui/database/model"
-	"x-ui/logger"
-	"x-ui/util/crypto"
+	"github.com/onlythezzz5-spec/zzz-console/database"
+	"github.com/onlythezzz5-spec/zzz-console/database/model"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/util/crypto"
 
 	"github.com/xlzd/gotp"
 	"gorm.io/gorm"

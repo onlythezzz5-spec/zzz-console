@@ -10,10 +10,10 @@ import (
 	"slices"
 	"time"
 
-	"x-ui/config"
-	"x-ui/database/model"
-	"x-ui/util/crypto"
-	"x-ui/xray"
+	"github.com/onlythezzz5-spec/zzz-console/config"
+	"github.com/onlythezzz5-spec/zzz-console/database/model"
+	"github.com/onlythezzz5-spec/zzz-console/util/crypto"
+	"github.com/onlythezzz5-spec/zzz-console/xray"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -36,8 +36,8 @@ func initModels() error {
 		&model.InboundClientIps{},
 		&xray.ClientTraffic{},
 		&model.HistoryOfSeeders{},
-		&LinkHistory{},   // 把 LinkHistory 表也迁移
-		&model.LotteryWin{},  // 新增 抽奖游戏LotteryWin 数据模型
+		&LinkHistory{},      // 把 LinkHistory 表也迁移
+		&model.LotteryWin{}, // 新增 抽奖游戏LotteryWin 数据模型
 	}
 	for _, model := range models {
 		if err := db.AutoMigrate(model); err != nil {

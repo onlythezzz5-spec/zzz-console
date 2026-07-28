@@ -48,7 +48,7 @@ body:
       required: false
 
   - type: input
-    id: xui-version
+    id: zzz-version
     attributes:
       label: ZZZ Console Version
       description: Which version of ZZZ Console are you using?

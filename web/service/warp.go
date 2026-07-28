@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/util/common"
 	"net/http"
 	"os"
 	"time"
-	"x-ui/logger"
-	"x-ui/util/common"
 )
 
 type WarpService struct {
@@ -68,7 +68,7 @@ func (s *WarpService) GetWarpConfig() (string, error) {
 func (s *WarpService) RegWarp(secretKey string, publicKey string) (string, error) {
 	tos := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	hostName, _ := os.Hostname()
-	data := fmt.Sprintf(`{"key":"%s","tos":"%s","type": "PC","model": "x-ui", "name": "%s"}`, publicKey, tos, hostName)
+	data := fmt.Sprintf(`{"key":"%s","tos":"%s","type": "PC","model": "zzz-console", "name": "%s"}`, publicKey, tos, hostName)
 
 	url := "https://api.cloudflareclient.com/v0a2158/reg"
 

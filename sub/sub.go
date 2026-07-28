@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"x-ui/config"
-	"x-ui/logger"
-	"x-ui/util/common"
-	"x-ui/web/middleware"
-	"x-ui/web/network"
-	"x-ui/web/service"
+	"github.com/onlythezzz5-spec/zzz-console/config"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/util/common"
+	"github.com/onlythezzz5-spec/zzz-console/web/middleware"
+	"github.com/onlythezzz5-spec/zzz-console/web/network"
+	"github.com/onlythezzz5-spec/zzz-console/web/service"
 
 	"github.com/gin-gonic/gin"
 )

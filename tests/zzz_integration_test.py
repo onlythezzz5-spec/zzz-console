@@ -33,7 +33,7 @@ def main() -> int:
         "web/html/settings.html",
         "web/html/xray.html",
         "install.sh",
-        "x-ui.sh",
+        "zzz.sh",
     )
     for relative in critical_console_files:
         if not (ROOT / relative).is_file():
@@ -56,14 +56,14 @@ def main() -> int:
             raise AssertionError(f"server toolkit file lost: {relative}")
 
     require(
-        "web/controller/xui.go",
+        "web/controller/zzz.go",
         'g.GET("/inbounds", a.inbounds)',
         'g.GET("/settings", a.settings)',
         'g.GET("/xray", a.xraySettings)',
         'g.GET("/tools", a.tools)',
         'g.GET("/navigation", a.navigation)',
     )
-    if 'g.GET("/servers"' in read("web/controller/xui.go"):
+    if 'g.GET("/servers"' in read("web/controller/zzz.go"):
         raise AssertionError("fake remote-server page route still exists")
     require(
         "web/html/component/aSidebar.html",
@@ -79,7 +79,7 @@ def main() -> int:
     if (ROOT / "web/html/servers.html").exists():
         raise AssertionError("fake remote-server page still exists")
 
-    require("web/html/tools.html", "x-ui tools", "内置完整服务器工具模块")
+    require("web/html/tools.html", "zzz tools", "内置完整服务器工具模块")
     require(
         "web/html/inbounds.html",
         "createVlessRealityInbound",
@@ -97,13 +97,35 @@ def main() -> int:
         "buildTlsInbound",
         "SendOneClickConfig",
     )
-    require("x-ui.sh", "zzz_tools()", '"tools")', "服务器工具箱（完整建站功能）")
+    require("zzz.sh", "zzz_tools()", '"tools")', "服务器工具箱（完整建站功能）")
     require(
         ".github/workflows/release.yml",
-        "cp -r tools x-ui/",
+        "cp -r tools zzz/",
+        "zzz-linux-${{ matrix.platform }}.tar.gz",
+        "zzz-windows-${{ matrix.platform }}.zip",
         "Copy-Item -Path ..\\tools -Destination . -Recurse",
     )
-    require("Dockerfile", "COPY --from=builder /app/tools /app/tools")
+    require(
+        "Dockerfile",
+        "COPY --from=builder /app/tools /app/tools",
+        "go build -ldflags",
+        "-o build/zzz",
+        "/usr/bin/zzz",
+        'VOLUME [ "/etc/zzz" ]',
+    )
+    require(
+        "zzz.service",
+        "WorkingDirectory=/usr/local/zzz/",
+        "ExecStart=/usr/local/zzz/zzz",
+    )
+    require(
+        "config/config.go",
+        'firstEnv("ZZZ_DB_FOLDER", "XUI_DB_FOLDER")',
+        'return "/etc/zzz"',
+        '"/etc/x-ui/x-ui.db"',
+    )
+    if (ROOT / "x-ui.sh").exists() or (ROOT / "x-ui.service").exists():
+        raise AssertionError("legacy command/service files remain at repository root")
     require("NOTICE.md", "Copyright (C) 2026 zzz", "X-Panel", "Kejilion")
     require(
         "README.md",
@@ -134,13 +156,33 @@ def main() -> int:
     ):
         if forbidden in install_script:
             raise AssertionError(f"installer still contains removed paywall logic: {forbidden}")
+    require(
+        "install.sh",
+        "zzz-linux-$(arch).tar.gz",
+        "/usr/local/zzz/zzz",
+        "/etc/zzz/zzz.db",
+        "systemctl enable zzz",
+        "ln -sfn /usr/bin/zzz /usr/bin/x-ui",
+    )
+
+    for relative in (
+        "README.md",
+        "docs/INSTALLATION.md",
+        "docs/OPERATIONS.md",
+        "docs/TROUBLESHOOTING.md",
+        "docs/FEATURES.md",
+        "web/html/navigation.html",
+        "web/html/tools.html",
+    ):
+        if "x-ui" in read(relative).lower():
+            raise AssertionError(f"{relative}: legacy product command remains user-visible")
 
     public_runtime = "\n".join(
         read(relative)
         for relative in (
             "README.md",
             "install.sh",
-            "x-ui.sh",
+            "zzz.sh",
             "web/html/index.html",
             "web/html/inbounds.html",
             "web/html/navigation.html",

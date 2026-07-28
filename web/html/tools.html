@@ -97,7 +97,7 @@
                     <p>内置完整服务器工具模块，覆盖系统、Docker、LNMP、建站、备份、安全和网络能力；交互式操作从服务器终端进入。</p>
                 </div>
                 <button class="terminal-command" type="button" @click="copyCommand">
-                    [[ copied ? '已复制' : 'x-ui tools' ]]
+                    [[ copied ? '已复制' : 'zzz tools' ]]
                 </button>
             </section>
 
@@ -137,7 +137,7 @@
             <div class="preserve-note">
                 <strong>功能边界：</strong>
                 Xray、入站、订阅、流量、Telegram、域名和证书仍由原面板管理；
-                建站工具的完整交互菜单通过 <code>x-ui tools</code> 打开，未删减原脚本功能。
+                建站工具的完整交互菜单通过 <code>zzz tools</code> 打开，未删减原脚本功能。
             </div>
         </a-layout-content>
     </a-layout>
@@ -157,11 +157,11 @@
         methods: {
             async copyCommand() {
                 try {
-                    await navigator.clipboard.writeText('x-ui tools');
+                    await navigator.clipboard.writeText('zzz tools');
                     this.copied = true;
                     setTimeout(() => { this.copied = false; }, 1800);
                 } catch (_) {
-                    this.$message.info('请在服务器终端执行：x-ui tools');
+                    this.$message.info('请在服务器终端执行：zzz tools');
                 }
             },
         },

@@ -6,11 +6,11 @@ services:
     container_name: zzz-console
     # hostname: yourhostname <<--- optional
     volumes:
-      - $PWD/db/:/etc/x-ui/
+      - $PWD/db/:/etc/zzz/
       - $PWD/cert/:/root/cert/
     environment:
       XRAY_VMESS_AEAD_FORCED: "false"
-      XUI_ENABLE_FAIL2BAN: "true"
+      ZZZ_ENABLE_FAIL2BAN: "true"
     tty: true
     network_mode: host
     restart: unless-stopped

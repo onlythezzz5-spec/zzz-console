@@ -26,14 +26,14 @@ import (
 	"strings"
 	"time"
 
-	"x-ui/config"
-	"x-ui/database"
-	"x-ui/database/model"
-	"x-ui/logger"
-	"x-ui/util/common"
-	"x-ui/web/global"
-	"x-ui/web/locale"
-	"x-ui/xray"
+	"github.com/onlythezzz5-spec/zzz-console/config"
+	"github.com/onlythezzz5-spec/zzz-console/database"
+	"github.com/onlythezzz5-spec/zzz-console/database/model"
+	"github.com/onlythezzz5-spec/zzz-console/logger"
+	"github.com/onlythezzz5-spec/zzz-console/util/common"
+	"github.com/onlythezzz5-spec/zzz-console/web/global"
+	"github.com/onlythezzz5-spec/zzz-console/web/locale"
+	"github.com/onlythezzz5-spec/zzz-console/xray"
 
 	"github.com/google/uuid"
 	"github.com/mymmrac/telego"
@@ -4262,7 +4262,7 @@ func (t *Tgbot) SendSubconverterSuccess() {
 
 // 【新增辅助函数】: 获取域名（shell 方案）
 func (t *Tgbot) getDomain() (string, error) {
-	cmd := exec.Command("/usr/local/x-ui/x-ui", "setting", "-getCert", "true")
+	cmd := exec.Command("/usr/local/zzz/zzz", "setting", "-getCert", "true")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", errors.New("执行命令获取证书路径失败，请确保已为面板配置 SSL 证书")
@@ -4278,7 +4278,7 @@ func (t *Tgbot) getDomain() (string, error) {
 	}
 
 	if certLine == "" {
-		return "", errors.New("无法从 x-ui 命令输出中找到证书路径")
+		return "", errors.New("无法从 zzz 命令输出中找到证书路径")
 	}
 
 	certPath := strings.TrimSpace(strings.TrimPrefix(certLine, "cert:"))
