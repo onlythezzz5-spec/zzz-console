@@ -33,6 +33,7 @@ RUN apk add --no-cache --update \
 
 COPY --from=builder /app/build/ /app/
 COPY --from=builder /app/DockerEntrypoint.sh /app/
+COPY --from=builder /app/tools /app/tools
 COPY --from=builder /app/x-ui.sh /usr/bin/x-ui
 
 

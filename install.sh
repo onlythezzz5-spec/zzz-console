@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==========================================================
-# X-Panel 统一安装脚本 (付费/免费二合一)
-# 作者: X-Panel
+# ZZZ Console 统一安装脚本
+# 整合维护: zzz
 # ==========================================================
 
 red='\033[0;31m'
@@ -46,7 +46,8 @@ get_hwid() {
 #
 install_paid_version() {
     echo ""
-    echo -e "${green}您正在安装/升级/更新 【X-Panel 付费Pro版】${plain}"
+    echo -e "${yellow}您正在进入上游 X-Panel Pro 第三方付费安装流程。${plain}"
+    echo -e "${yellow}该服务不属于 ZZZ Console，也不由 zzz 运营。${plain}"
     echo ""
     echo -e "${yellow}------------------------------------------------------${plain}"
     echo ""
@@ -114,7 +115,7 @@ install_paid_version() {
 # ----------------------------------------------------------
 install_free_version() {
     echo ""
-    echo -e "${green}您选择了安装 【X-Panel 免费基础版】${plain}"
+    echo -e "${green}您选择了安装 【ZZZ Console 免费基础版】${plain}"
     echo ""
     echo -e "${green}即将开始执行标准安装流程...${plain}"
     sleep 2
@@ -166,7 +167,7 @@ install_free_version() {
     # echo ""
     echo -e "${yellow}---------->>>>>当前系统的架构为: $(arch)${plain}"
     echo ""
-    last_version=$(curl -Ls "https://api.github.com/repos/xeefei/x-panel/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    last_version=$(curl -Ls "https://api.github.com/repos/onlythezzz5-spec/zzz-console/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     # 获取 x-ui 版本
     xui_version=$(/usr/local/x-ui/x-ui -v)
 
@@ -175,19 +176,19 @@ install_free_version() {
         echo ""
         echo -e "${red}------>>>当前服务器没有安装任何 x-ui 系列代理面板${plain}"
         echo ""
-        echo -e "${green}-------->>>>片刻之后脚本将会自动引导安装〔X-Panel面板〕${plain}"
+        echo -e "${green}-------->>>>片刻之后脚本将会自动引导安装〔ZZZ Console〕${plain}"
     else
         # 检查版本号中是否包含冒号
         if [[ "$xui_version" == *:* ]]; then
             echo -e "${green}---------->>>>>当前代理面板的版本为: ${red}其他 x-ui 分支版本${plain}"
             echo ""
-            echo -e "${green}-------->>>>片刻之后脚本将会自动引导安装〔X-Panel面板〕${plain}"
+            echo -e "${green}-------->>>>片刻之后脚本将会自动引导安装〔ZZZ Console〕${plain}"
         else
-            echo -e "${green}---------->>>>>当前代理面板的版本为: ${red}〔X-Panel面板〕v${xui_version}${plain}"
+            echo -e "${green}---------->>>>>当前代理面板的版本为: ${red}〔ZZZ Console〕v${xui_version}${plain}"
         fi
     fi
     echo ""
-    echo -e "${yellow}---------------------->>>>>〔X-Panel面板〕最新版为：${last_version}${plain}"
+    echo -e "${yellow}---------------------->>>>>〔ZZZ Console〕最新版为：${last_version}${plain}"
     sleep 4
 
     os_version=$(grep -i version_id /etc/os-release | cut -d \" -f2 | cut -d . -f1)
@@ -341,14 +342,14 @@ install_free_version() {
 
         # Download resources
         if [ $# == 0 ]; then
-            last_version=$(curl -Ls "https://api.github.com/repos/xeefei/x-panel/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+            last_version=$(curl -Ls "https://api.github.com/repos/onlythezzz5-spec/zzz-console/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
             if [[ ! -n "$last_version" ]]; then
-                echo -e "${red}获取 X-Panel 版本失败，可能是 Github API 限制，请稍后再试${plain}"
+                echo -e "${red}获取 ZZZ Console 版本失败，可能是 Github API 限制，请稍后再试${plain}"
                 exit 1
             fi
             echo ""
             echo -e "-----------------------------------------------------"
-            echo -e "${green}--------->>获取 X-Panel 最新版本：${yellow}${last_version}${plain}${green}，开始安装...${plain}"
+            echo -e "${green}--------->>获取 ZZZ Console 最新版本：${yellow}${last_version}${plain}${green}，开始安装...${plain}"
             echo -e "-----------------------------------------------------"
             echo ""
             sleep 2
@@ -358,17 +359,17 @@ install_free_version() {
             echo -e "${green}---------------->>>>>>>>>>>>>>>>>>>>>安装进度100%${plain}"
             echo ""
             sleep 2
-            wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(arch).tar.gz https://github.com/xeefei/x-panel/releases/download/${last_version}/x-ui-linux-$(arch).tar.gz
+            wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(arch).tar.gz https://github.com/onlythezzz5-spec/zzz-console/releases/download/${last_version}/x-ui-linux-$(arch).tar.gz
             if [[ $? -ne 0 ]]; then
-                echo -e "${red}下载 X-Panel 失败, 请检查服务器是否可以连接至 GitHub？ ${plain}"
+                echo -e "${red}下载 ZZZ Console 失败, 请检查服务器是否可以连接至 GitHub？ ${plain}"
                 exit 1
             fi
         else
             last_version=$1
-            url="https://github.com/xeefei/x-panel/releases/download/${last_version}/x-ui-linux-$(arch).tar.gz"
+            url="https://github.com/onlythezzz5-spec/zzz-console/releases/download/${last_version}/x-ui-linux-$(arch).tar.gz"
             echo ""
             echo -e "--------------------------------------------"
-            echo -e "${green}---------------->>>>开始安装 X-Panel 免费基础版$1${plain}"
+            echo -e "${green}---------------->>>>开始安装 ZZZ Console 免费基础版$1${plain}"
             echo -e "--------------------------------------------"
             echo ""
             sleep 2
@@ -380,11 +381,11 @@ install_free_version() {
             sleep 2
             wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(arch).tar.gz ${url}
             if [[ $? -ne 0 ]]; then
-                echo -e "${red}下载 X-Panel $1 失败, 请检查此版本是否存在 ${plain}"
+                echo -e "${red}下载 ZZZ Console $1 失败, 请检查此版本是否存在 ${plain}"
                 exit 1
             fi
         fi
-        wget -O /usr/bin/x-ui-temp https://raw.githubusercontent.com/xeefei/x-panel/main/x-ui.sh
+        wget -O /usr/bin/x-ui-temp https://raw.githubusercontent.com/onlythezzz5-spec/zzz-console/main/x-ui.sh
 
         # Stop x-ui service and remove old resources
         if [[ -e /usr/local/x-ui/ ]]; then
@@ -401,6 +402,9 @@ install_free_version() {
         cd x-ui
         chmod +x x-ui
         chmod +x x-ui.sh
+        if [[ -f tools/kejilion/kejilion.sh ]]; then
+            chmod +x tools/kejilion/kejilion.sh
+        fi
 
         # Check the system's architecture and rename the file accordingly
         if [[ $(arch) == "armv5" || $(arch) == "armv6" || $(arch) == "armv7" ]]; then
@@ -449,9 +453,9 @@ install_free_version() {
                 echo ""
                 echo -e "${green}3、请在终端中成功输入服务器的〔root密码〕，注意区分大小写，用以上命令进行转发${plain}"
                 echo ""
-                echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}[::1]:15208${existing_webBasePath}${plain} ${green}进入〔X-Panel面板〕登录界面"
+                echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}[::1]:15208${existing_webBasePath}${plain} ${green}进入〔ZZZ Console〕登录界面"
                 echo ""
-                echo -e "${red}注意：若不使用〔ssh转发〕请为X-Panel面板配置安装证书再行登录管理后台${plain}"
+                echo -e "${red}注意：若不使用〔ssh转发〕请为ZZZ Console配置安装证书再行登录管理后台${plain}"
             elif [[ -n $v4 && -n $v6 ]]; then
                 echo -e "${green}1、本地电脑客户端转发命令：${plain} ${blue}ssh -L 15208:127.0.0.1:${existing_port}${blue} root@$v4${plain} ${yellow}或者 ${blue}ssh  -L [::]:15208:127.0.0.1:${existing_port}${blue} root@[$v6]${plain}"
                 echo ""
@@ -459,9 +463,9 @@ install_free_version() {
                 echo ""
                 echo -e "${green}3、请在终端中成功输入服务器的〔root密码〕，注意区分大小写，用以上命令进行转发${plain}"
                 echo ""
-                echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}127.0.0.1:15208${existing_webBasePath}${plain} ${yellow}或者${plain} ${blue}[::1]:15208${existing_webBasePath}${plain} ${green}进入〔X-Panel面板〕登录界面"
+                echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}127.0.0.1:15208${existing_webBasePath}${plain} ${yellow}或者${plain} ${blue}[::1]:15208${existing_webBasePath}${plain} ${green}进入〔ZZZ Console〕登录界面"
                 echo ""
-                echo -e "${red}注意：若不使用〔ssh转发〕请为X-Panel面板配置安装证书再行登录管理后台${plain}"
+                echo -e "${red}注意：若不使用〔ssh转发〕请为ZZZ Console配置安装证书再行登录管理后台${plain}"
             else
                 echo -e "${green}1、本地电脑客户端转发命令：${plain} ${blue}ssh -L 15208:127.0.0.1:${existing_port}${blue} root@$v4${plain}"
                 echo ""
@@ -469,9 +473,9 @@ install_free_version() {
                 echo ""
                 echo -e "${green}3、请在终端中成功输入服务器的〔root密码〕，注意区分大小写，用以上命令进行转发${plain}"
                 echo ""
-                echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}127.0.0.1:15208${existing_webBasePath}${plain} ${green}进入〔X-Panel面板〕登录界面"
+                echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}127.0.0.1:15208${existing_webBasePath}${plain} ${green}进入〔ZZZ Console〕登录界面"
                 echo ""
-                echo -e "${red}注意：若不使用〔ssh转发〕请为X-Panel面板配置安装证书再行登录管理后台${plain}"
+                echo -e "${red}注意：若不使用〔ssh转发〕请为ZZZ Console配置安装证书再行登录管理后台${plain}"
                 echo ""
             fi
         fi
@@ -491,28 +495,28 @@ install_free_version() {
         wg-quick up wgcf >/dev/null 2A>&1
 
         echo ""
-        echo -e "------->>>>${green}X-Panel 免费基础版 ${last_version}${plain}<<<<安装成功，正在启动..."
+        echo -e "------->>>>${green}ZZZ Console 免费基础版 ${last_version}${plain}<<<<安装成功，正在启动..."
         sleep 1
         echo ""
         echo -e "         ---------------------"
-        echo -e "         |${green}X-Panel 控制菜单用法 ${plain}|${plain}"
+        echo -e "         |${green}ZZZ Console 控制菜单用法 ${plain}|${plain}"
         echo -e "         |  ${yellow}一个更好的面板   ${plain}|${plain}"   
         echo -e "         | ${yellow}基于Xray Core构建 ${plain}|${plain}"  
         echo -e "--------------------------------------------"
         echo -e "x-ui              - 进入管理脚本"
-        echo -e "x-ui start        - 启动 X-Panel 面板"
-        echo -e "x-ui stop         - 关闭 X-Panel 面板"
-        echo -e "x-ui restart      - 重启 X-Panel 面板"
-        echo -e "x-ui status       - 查看 X-Panel 状态"
+        echo -e "x-ui start        - 启动 ZZZ Console"
+        echo -e "x-ui stop         - 关闭 ZZZ Console"
+        echo -e "x-ui restart      - 重启 ZZZ Console"
+        echo -e "x-ui status       - 查看 ZZZ Console 状态"
         echo -e "x-ui settings     - 查看当前设置信息"
-        echo -e "x-ui enable       - 启用 X-Panel 开机启动"
-        echo -e "x-ui disable      - 禁用 X-Panel 开机启动"
-        echo -e "x-ui log          - 查看 X-Panel 运行日志"
+        echo -e "x-ui enable       - 启用 ZZZ Console 开机启动"
+        echo -e "x-ui disable      - 禁用 ZZZ Console 开机启动"
+        echo -e "x-ui log          - 查看 ZZZ Console 运行日志"
         echo -e "x-ui banlog       - 检查 Fail2ban 禁止日志"
-        echo -e "x-ui update       - 更新 X-Panel 面板"
-        echo -e "x-ui custom       - 自定义 X-Panel 版本"
-        echo -e "x-ui install      - 安装 X-Panel 面板"
-        echo -e "x-ui uninstall    - 卸载 X-Panel 面板"
+        echo -e "x-ui update       - 更新 ZZZ Console"
+        echo -e "x-ui custom       - 自定义 ZZZ Console 版本"
+        echo -e "x-ui install      - 安装 ZZZ Console"
+        echo -e "x-ui uninstall    - 卸载 ZZZ Console"
         echo -e "--------------------------------------------"
         echo ""
         # if [[ -n $ipv4 ]]; then
@@ -525,7 +529,7 @@ install_free_version() {
         sleep 3
         echo -e ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
         echo ""
-        echo -e "${yellow}----->>>X-Panel面板和Xray启动成功<<<-----${plain}"
+        echo -e "${yellow}----->>>ZZZ Console和Xray启动成功<<<-----${plain}"
     }
 
     # 设置VPS中的时区/时间为【上海时间】
@@ -544,37 +548,10 @@ install_free_version() {
     echo -e "----------------------------------------------"
     echo ""
     sleep 2
-    echo -e "${green}安装/更新完成，若在使用过程中有任何问题${plain}"
-    echo -e "${yellow}请先描述清楚所遇问题加〔X-Panel面板〕交流群${plain}"
-    echo -e "${yellow}在TG群中${red} https://t.me/XUI_CN ${yellow}截图进行反馈${plain}"
+    echo -e "${green}ZZZ Console 安装/更新完成${plain}"
+    echo -e "${green}〔ZZZ Console〕项目地址：${yellow}https://github.com/onlythezzz5-spec/zzz-console${plain}" 
     echo ""
-    echo -e "----------------------------------------------"
-    echo ""
-    echo -e "${green}〔X-Panel面板〕项目地址：${yellow}https://github.com/xeefei/x-panel${plain}" 
-    echo ""
-    echo -e "${green} 详细安装教程：${yellow}https://xeefei.blogspot.com/2025/09/x-panel.html${plain}"
-    echo ""
-    echo -e "----------------------------------------------"
-    echo ""
-    echo -e "-------------->>>>>>>赞 助 推 广 区<<<<<<<<-------------------"
-    echo ""
-    echo -e "${green}1、搬瓦工GIA高端线路：${yellow}https://bandwagonhost.com/aff.php?aff=75015${plain}"
-    echo ""
-    echo -e "${green}2、Dmit高端GIA线路：${yellow}https://www.dmit.io/aff.php?aff=9326${plain}"
-    echo ""
-    echo -e "${green}3、Gomami亚太顶尖优化线路：${yellow}https://gomami.io/aff.php?aff=174${plain}"
-    echo ""
-    echo -e "${green}4、ISIF优质亚太优化线路：${yellow}https://cloud.isif.net/login?affiliation_code=333${plain}"
-    echo ""
-    echo -e "${green}5、ZoroCloud全球优质原生家宽&住宅双lSP，跨境首选：${yellow}https://my.zorocloud.com/aff.php?aff=1072${plain}"
-    echo ""
-    echo -e "${green}6、三网直连 IEPL / IPLC 直播流量转发：${yellow}https://idc333.top/#register/BCUZXNELNO${plain}"
-    echo ""
-    echo -e "${green}7、Bagevm优质落地鸡（原生IP全解锁）：${yellow}https://www.bagevm.com/aff.php?aff=754${plain}"
-    echo ""
-    echo -e "${green}8、白丝云〔4837线路〕实惠量大管饱：${yellow}https://cloudsilk.io/aff.php?aff=706${plain}"
-    echo ""
-    echo -e "${green}9、RackNerd极致性价比机器：${yellow}https://my.racknerd.com/aff.php?aff=15268&pid=912${plain}"
+    echo -e "${green}服务器工具箱：${yellow}x-ui tools${plain}"
     echo ""
     echo -e "----------------------------------------------"
     echo ""
@@ -587,14 +564,14 @@ install_free_version() {
 # ----------------------------------------------------------
 main_menu() {
     echo -e "${green}======================================================${plain}"
-    echo -e " 欢迎使用 ${yellow}〔X-Panel 面板〕${plain} 一键安装脚本"
+    echo -e " 欢迎使用 ${yellow}〔ZZZ Console〕${plain} 一键安装脚本"
     echo -e "${green}======================================================${plain}"
     echo ""
     echo -e "请选择您要安装的版本:"
     echo ""
-    echo -e "  ${green}1)${plain} 安装 ${yellow}〔X-Panel 面板〕免费基础版${plain} (GitHub 开源项目)"
+    echo -e "  ${green}1)${plain} 安装 ${yellow}〔ZZZ Console〕免费基础版${plain} (GitHub 开源项目)"
     echo ""
-    echo -e "  ${green}2)${plain} 安装 ${yellow}〔X-Panel 面板〕付费Pro版${plain} (需要购买授权码)"
+    echo -e "  ${green}2)${plain} 进入 ${yellow}上游 X-Panel Pro${plain} 第三方安装流程"
     echo ""
     read -p "请输入您的选择 (1 或 2): " version_choice
     echo ""

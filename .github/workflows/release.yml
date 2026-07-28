@@ -83,6 +83,7 @@ jobs:
           cp xui-release x-ui/
           cp x-ui.service x-ui/
           cp x-ui.sh x-ui/
+          cp -r tools x-ui/
           mv x-ui/xui-release x-ui/x-ui
           mkdir x-ui/bin
           cd x-ui/bin
@@ -231,6 +232,7 @@ jobs:
           # 辅助文件都放在了项目根目录的 windows_files 文件夹下
           # ===============================================================
           Copy-Item -Path ..\windows_files\* -Destination . -Recurse
+          Copy-Item -Path ..\tools -Destination . -Recurse
 
           # 〔中文注释〕: 返回项目根目录
           cd ..

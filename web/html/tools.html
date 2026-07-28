@@ -1,0 +1,170 @@
+{{ template "page/head_start" .}}
+<style>
+    .tools-shell {
+        min-height: 100vh;
+        background: #0b100e;
+    }
+    .tools-content {
+        padding: 24px;
+    }
+    .tools-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 24px;
+        margin-bottom: 18px;
+        padding: 24px;
+        color: #edf5f0;
+        background: #121815;
+        border: 1px solid #27322c;
+        border-left: 4px solid #4ee08b;
+    }
+    .tools-kicker {
+        color: #4ee08b;
+        font: 600 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+        letter-spacing: .14em;
+    }
+    .tools-hero h1 {
+        margin: 8px 0 5px;
+        color: #edf5f0;
+    }
+    .tools-hero p {
+        max-width: 720px;
+        margin: 0;
+        color: #91a099;
+    }
+    .terminal-command {
+        min-width: 210px;
+        padding: 14px 16px;
+        color: #4ee08b;
+        background: #090d0c;
+        border: 1px solid #27322c;
+        font: 700 15px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+        text-align: center;
+        cursor: pointer;
+    }
+    .tool-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+    }
+    .tool-card {
+        min-height: 175px;
+        padding: 20px;
+        background: #121815;
+        border: 1px solid #27322c;
+    }
+    .tool-card .anticon {
+        color: #4ee08b;
+        font-size: 20px;
+    }
+    .tool-card h3 {
+        margin: 16px 0 8px;
+        color: #edf5f0;
+    }
+    .tool-card p {
+        margin: 0;
+        color: #91a099;
+        line-height: 1.75;
+    }
+    .preserve-note {
+        margin-top: 14px;
+        padding: 18px 20px;
+        color: #91a099;
+        background: #121815;
+        border: 1px solid #27322c;
+    }
+    .preserve-note strong { color: #edf5f0; }
+    @media (max-width: 960px) {
+        .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+        .tools-content { padding: 14px; }
+        .tools-hero { align-items: stretch; flex-direction: column; }
+        .tool-grid { grid-template-columns: 1fr; }
+    }
+</style>
+{{ template "page/head_end" .}}
+{{ template "page/body_start" .}}
+<a-layout id="app" class="tools-shell" v-cloak>
+    <a-sidebar></a-sidebar>
+    <a-layout>
+        <a-layout-content class="tools-content">
+            <section class="tools-hero">
+                <div>
+                    <div class="tools-kicker">ZZZ / SERVER TOOLBOX</div>
+                    <h1>服务器工具箱</h1>
+                    <p>完整保留 Kejilion 系统工具、Docker、LNMP、建站、备份、安全和网络能力；交互式操作从服务器终端进入。</p>
+                </div>
+                <button class="terminal-command" type="button" @click="copyCommand">
+                    [[ copied ? '已复制' : 'x-ui tools' ]]
+                </button>
+            </section>
+
+            <section class="tool-grid">
+                <article class="tool-card">
+                    <a-icon type="global"></a-icon>
+                    <h3>LNMP 与网站</h3>
+                    <p>Nginx、MySQL、PHP、站点创建、HTTPS、反向代理、站点优化与迁移。</p>
+                </article>
+                <article class="tool-card">
+                    <a-icon type="container"></a-icon>
+                    <h3>Docker 管理</h3>
+                    <p>Docker 环境、容器、镜像、网络、应用编排与常用服务部署。</p>
+                </article>
+                <article class="tool-card">
+                    <a-icon type="safety-certificate"></a-icon>
+                    <h3>安全与证书</h3>
+                    <p>防火墙、Fail2ban、SSH、证书续签、访问限制与系统加固。</p>
+                </article>
+                <article class="tool-card">
+                    <a-icon type="dashboard"></a-icon>
+                    <h3>系统维护</h3>
+                    <p>系统信息、软件更新、进程、磁盘、时区、Swap 与内核管理。</p>
+                </article>
+                <article class="tool-card">
+                    <a-icon type="cloud-upload"></a-icon>
+                    <h3>备份与迁移</h3>
+                    <p>网站、数据库和服务配置的备份、恢复、迁移与定时任务。</p>
+                </article>
+                <article class="tool-card">
+                    <a-icon type="thunderbolt"></a-icon>
+                    <h3>网络优化</h3>
+                    <p>BBR、网络诊断、测速、DNS、路由与 TCP 参数优化。</p>
+                </article>
+            </section>
+
+            <div class="preserve-note">
+                <strong>功能边界：</strong>
+                Xray、入站、订阅、流量、Telegram、域名和证书仍由原面板管理；
+                建站工具的完整交互菜单通过 <code>x-ui tools</code> 打开，未删减原脚本功能。
+            </div>
+        </a-layout-content>
+    </a-layout>
+</a-layout>
+
+{{ template "page/body_scripts" .}}
+{{ template "component/aSidebar" .}}
+{{ template "component/aThemeSwitch" .}}
+<script>
+    const app = new Vue({
+        delimiters: ['[[', ']]'],
+        el: '#app',
+        data: {
+            themeSwitcher,
+            copied: false,
+        },
+        methods: {
+            async copyCommand() {
+                try {
+                    await navigator.clipboard.writeText('x-ui tools');
+                    this.copied = true;
+                    setTimeout(() => { this.copied = false; }, 1800);
+                } catch (_) {
+                    this.$message.info('请在服务器终端执行：x-ui tools');
+                }
+            },
+        },
+    });
+</script>
+{{ template "page/body_end" .}}

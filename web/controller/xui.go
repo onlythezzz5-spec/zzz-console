@@ -2,7 +2,7 @@ package controller
 
 import (
 	"x-ui/web/service"
-	
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,7 +13,7 @@ type XUIController struct {
 	serverController      *ServerController
 	settingController     *SettingController
 	xraySettingController *XraySettingController
-	serverService  service.ServerService
+	serverService         service.ServerService
 }
 
 func NewXUIController(g *gin.RouterGroup) *XUIController {
@@ -30,9 +30,10 @@ func (a *XUIController) initRouter(g *gin.RouterGroup) {
 	g.GET("/inbounds", a.inbounds)
 	g.GET("/settings", a.settings)
 	g.GET("/xray", a.xraySettings)
+	g.GET("/tools", a.tools)
 	g.GET("/navigation", a.navigation)
 
-                 // 【新增 2】注册页面路由
+	// 【新增 2】注册页面路由
 	g.GET("/servers", a.serversPage)
 
 	a.inboundController = NewInboundController(g)
@@ -55,6 +56,10 @@ func (a *XUIController) settings(c *gin.Context) {
 
 func (a *XUIController) xraySettings(c *gin.Context) {
 	html(c, "xray.html", "pages.xray.title", nil)
+}
+
+func (a *XUIController) tools(c *gin.Context) {
+	html(c, "tools.html", "pages.index.title", nil)
 }
 
 func (a *XUIController) navigation(c *gin.Context) {
