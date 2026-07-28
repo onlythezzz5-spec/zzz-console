@@ -1,4 +1,4 @@
-name: Release X-Panel for Docker
+name: Release ZZZ Console for Docker
 on:
   workflow_dispatch:
   push:

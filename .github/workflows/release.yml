@@ -1,4 +1,4 @@
-name: Release X-Panel
+name: Release ZZZ Console
 
 on:
   workflow_dispatch:
@@ -47,7 +47,7 @@ jobs:
           go-version-file: go.mod
           check-latest: true
 
-      - name: Build X-Panel for Linux
+      - name: Build ZZZ Console for Linux
         run: |
           export CGO_ENABLED=1
           export GOOS=linux
@@ -174,7 +174,7 @@ jobs:
           go-version-file: go.mod
           check-latest: true
 
-      - name: Build X-Panel for Windows
+      - name: Build ZZZ Console for Windows
         # 〔中文注释〕: 使用 PowerShell 执行脚本，更符合 Windows 环境
         shell: pwsh
         run: |

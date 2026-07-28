@@ -19,7 +19,7 @@ RUN go build -ldflags "-w -s" -o build/x-ui main.go
 RUN ./DockerInit.sh "$TARGETARCH"
 
 # ========================================================
-# ----->> Stage: Final Image of X-Panel
+# ----->> Stage: Final Image of ZZZ Console
 # ========================================================
 FROM alpine
 ENV TZ=Asia/Tehran
