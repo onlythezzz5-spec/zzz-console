@@ -2,6 +2,11 @@ name: Release ZZZ Console
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to receive build assets
+        required: true
+        default: v1.0.0
   release:
     types: [published]
   push:
@@ -140,10 +145,10 @@ jobs:
 
       - name: Upload files to GH release
         uses: svenstaro/upload-release-action@v2
-        if: github.event_name == 'release' && github.event.action == 'published'
+        if: (github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'workflow_dispatch'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref }}
+          tag: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
           file: x-ui-linux-${{ matrix.platform }}.tar.gz
           asset_name: x-ui-linux-${{ matrix.platform }}.tar.gz
           # 如果这是预发布版本，可以此行注释
@@ -253,10 +258,10 @@ jobs:
 
       - name: Upload files to GH release
         uses: svenstaro/upload-release-action@v2
-        if: github.event_name == 'release' && github.event.action == 'published'
+        if: (github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'workflow_dispatch'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref }}
+          tag: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
           # 〔中文注释〕: 指定要上传的文件为 windows 的 zip 包
           file: x-ui-windows-${{ matrix.platform }}.zip
           # 〔中文注释〕: 在 Release 页面显示的资产名称
