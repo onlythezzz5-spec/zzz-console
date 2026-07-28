@@ -50,8 +50,8 @@ body:
   - type: input
     id: xui-version
     attributes:
-      label: x-panel Version
-      description: Which version of x-panel are you using?
+      label: ZZZ Console Version
+      description: Which version of ZZZ Console are you using?
       placeholder: 2.X.X
     validations:
       required: true

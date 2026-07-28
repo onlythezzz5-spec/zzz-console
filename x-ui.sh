@@ -2106,9 +2106,6 @@ show_menu() {
 ——————————————————————
   ${green}ZZZ Console 项目地址${plain}
   ${yellow}https://github.com/onlythezzz5-spec/zzz-console${plain}
-  ${green}上游项目${plain}
-  ${yellow}X-Panel: https://github.com/xeefei/X-Panel${plain}
-  ${yellow}Kejilion: https://github.com/kejilion/sh${plain}
 ——————————————————————
 "
     show_status

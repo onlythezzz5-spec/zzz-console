@@ -33,9 +33,6 @@ func (a *XUIController) initRouter(g *gin.RouterGroup) {
 	g.GET("/tools", a.tools)
 	g.GET("/navigation", a.navigation)
 
-	// 【新增 2】注册页面路由
-	g.GET("/servers", a.serversPage)
-
 	a.inboundController = NewInboundController(g)
 	a.serverController = NewServerController(g, a.serverService)
 	a.settingController = NewSettingController(g)
@@ -64,9 +61,4 @@ func (a *XUIController) tools(c *gin.Context) {
 
 func (a *XUIController) navigation(c *gin.Context) {
 	html(c, "navigation.html", "pages.navigation.title", nil)
-}
-
-// 【新增 4】添加页面渲染方法
-func (a *XUIController) serversPage(c *gin.Context) {
-	html(c, "servers.html", "pages.controlledmanagement.title", nil)
 }

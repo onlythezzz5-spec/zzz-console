@@ -15,107 +15,11 @@ plain='\033[0m'
 [[ $EUID -ne 0 ]] && echo -e "${red}致命错误: ${plain} 请使用 root 权限运行此脚本\n" && exit 1
 
 # ----------------------------------------------------------
-# 获取机器唯一硬件标识 (HWID)
-# ----------------------------------------------------------
-get_hwid() {
-    local machine_id=""
-
-    # 1. 优先尝试获取 DMI Product UUID (VPS 硬件 ID，重装系统通常不变)
-    if [[ -r /sys/class/dmi/id/product_uuid ]]; then
-        machine_id=$(cat /sys/class/dmi/id/product_uuid)
-    
-    # 2. 其次尝试获取 eth0 网卡 MAC 地址 (大部分 VPS 重装后 MAC 不变)
-    elif [[ -r /sys/class/net/eth0/address ]]; then
-        machine_id=$(cat /sys/class/net/eth0/address)
-        
-    # 3. 如果都失败，才使用 machine-id (重装会变，作为最后兜底)
-    elif [[ -f /etc/machine-id ]]; then
-        machine_id=$(cat /etc/machine-id)
-    else
-        machine_id=$(hostname)
-    fi
-    
-    # 取 MD5 作为唯一指纹，确保格式统一
-    echo -n "$machine_id" | md5sum | awk '{print $1}'
-}
-
-# ----------------------------------------------------------
-# 函数：付费Pro版安装逻辑 (install_paid_version)
-# ----------------------------------------------------------
-# 此函数负责获取授权码和IP + 机器指纹，并从远程授权服务器获取并执行付费脚本
-#
-install_paid_version() {
-    echo ""
-    echo -e "${yellow}您正在进入上游 X-Panel Pro 第三方付费安装流程。${plain}"
-    echo -e "${yellow}该服务不属于 ZZZ Console，也不由 zzz 运营。${plain}"
-    echo ""
-    echo -e "${yellow}------------------------------------------------------${plain}"
-    echo ""
-
-    # 1. 提示用户输入授权码
-    read -p "$(echo -e "${yellow}请输入您的授权码 (License Key): ${plain}")" auth_key
-    echo ""
-    
-    if [ -z "$auth_key" ]; then
-        echo -e "${red}错误: 您没有输入授权码。${plain}"
-        exit 1
-    fi
-    
-    # 2. 获取本机的公共 IPv4 地址
-    echo -e "${green}正在获取本机 IP 地址......${plain}"
-    vps_ip=$(curl -s4m8 ip.sb -k | head -n 1)
-    
-    if [ -z "$vps_ip" ]; then
-        echo -e "${red}致命错误: 未能获取服务器的公共 IP 地址。${plain}"
-        echo -e "${red}请检查您的网络连接或 curl 是否正常工作。${plain}"
-        exit 1
-    fi
-
-    # 3. [新增] 获取本机硬件指纹
-    vps_hwid=$(get_hwid)
-
-    echo -e "${green}本机 IP: ${vps_ip}${plain}"
-    echo -e "${green}机器指纹: ${vps_hwid}${plain}" # 调试用
-    echo ""
-    
-    # 4. 设置您的授权服务器地址
-    AUTH_SERVER_URL="https://auth.x-panel.vip/install_pro.php"
-    
-    echo -e "${green}正在连接〔远程授权服务器〕进行验证......${plain}"
-    echo ""
-    echo -e "${yellow}请稍候.........${plain}"
-    
-    # 5. 将服务器响应保存到变量
-    response=$(curl -sL --connect-timeout 20 -X POST -d "key=${auth_key}&ip=${vps_ip}&hwid=${vps_hwid}" "${AUTH_SERVER_URL}")
-    
-    # 6. 简单判断响应是否为空
-    if [ -z "$response" ]; then
-        echo -e "${red}错误: 无法连接到授权服务器或服务器无响应。${plain}"
-        echo -e "${yellow}请检查网络连接或联系管理员。${plain}"
-        exit 1
-    fi
-
-    # 7. 判断是否包含 PHP 错误 (如 Syntax error 或 Fatal error)
-    # 如果 PHP 报错，通常会包含 "Fatal error" 或 "Parse error" 字样
-    if echo "$response" | grep -qE "Fatal error|Parse error"; then
-         echo -e "${red}错误: 授权服务器发生内部错误。${plain}"
-         echo -e "详细信息: $response"
-         exit 1
-    fi
-
-    # 8. 执行脚本
-    bash <(echo "$response")
-    
-    exit 0
-}
-
-
-# ----------------------------------------------------------
-# 函数：免费基础版安装逻辑 (install_free_version) 
+# ZZZ Console 安装逻辑
 # ----------------------------------------------------------
 install_free_version() {
     echo ""
-    echo -e "${green}您选择了安装 【ZZZ Console 免费基础版】${plain}"
+    echo -e "${green}开始安装【ZZZ Console】${plain}"
     echo ""
     echo -e "${green}即将开始执行标准安装流程...${plain}"
     sleep 2
@@ -369,7 +273,7 @@ install_free_version() {
             url="https://github.com/onlythezzz5-spec/zzz-console/releases/download/${last_version}/x-ui-linux-$(arch).tar.gz"
             echo ""
             echo -e "--------------------------------------------"
-            echo -e "${green}---------------->>>>开始安装 ZZZ Console 免费基础版$1${plain}"
+            echo -e "${green}---------------->>>>开始安装 ZZZ Console$1${plain}"
             echo -e "--------------------------------------------"
             echo ""
             sleep 2
@@ -495,7 +399,7 @@ install_free_version() {
         wg-quick up wgcf >/dev/null 2A>&1
 
         echo ""
-        echo -e "------->>>>${green}ZZZ Console 免费基础版 ${last_version}${plain}<<<<安装成功，正在启动..."
+        echo -e "------->>>>${green}ZZZ Console ${last_version}${plain}<<<<安装成功，正在启动..."
         sleep 1
         echo ""
         echo -e "         ---------------------"
@@ -562,38 +466,10 @@ install_free_version() {
 # ----------------------------------------------------------
 # 脚本主菜单
 # ----------------------------------------------------------
-main_menu() {
-    echo -e "${green}======================================================${plain}"
-    echo -e " 欢迎使用 ${yellow}〔ZZZ Console〕${plain} 一键安装脚本"
-    echo -e "${green}======================================================${plain}"
-    echo ""
-    echo -e "请选择您要安装的版本:"
-    echo ""
-    echo -e "  ${green}1)${plain} 安装 ${yellow}〔ZZZ Console〕免费基础版${plain} (GitHub 开源项目)"
-    echo ""
-    echo -e "  ${green}2)${plain} 进入 ${yellow}上游 X-Panel Pro${plain} 第三方安装流程"
-    echo ""
-    read -p "请输入您的选择 (1 或 2): " version_choice
-    echo ""
-    
-    case "$version_choice" in
-        1)
-            # 如果选择1，调用免费版函数
-            install_free_version
-            ;;
-        2)
-            # 如果选择2，调用付费版函数
-            install_paid_version
-            ;;
-        *)
-            echo -e "${red}输入无效, 退出安装。${plain}"
-            exit 1
-            ;;
-    esac
-}
-
-# ----------------------------------------------------------
-# 脚本执行入口
+# ?????????????? ZZZ Console
 # ----------------------------------------------------------
 clear
-main_menu
+echo -e "${green}======================================================${plain}"
+echo -e "       ${yellow}ZZZ Console${plain} ????"
+echo -e "${green}======================================================${plain}"
+install_free_version "$@"

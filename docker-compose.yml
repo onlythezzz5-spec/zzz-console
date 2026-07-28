@@ -1,9 +1,9 @@
 services:
-  x-panel:
+  zzz-console:
     build:
       context: .
       dockerfile: ./Dockerfile
-    container_name: x-panel_app
+    container_name: zzz-console
     # hostname: yourhostname <<--- optional
     volumes:
       - $PWD/db/:/etc/x-ui/

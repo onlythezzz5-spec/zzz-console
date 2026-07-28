@@ -3,28 +3,28 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/tls" // 新增：用于 tls.Config
 	"embed"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json" // 新增：用于 json.Marshal / Unmarshal
+	"encoding/xml"  // 【新增】: 用于直接解析 RSS XML 响应体
 	"errors"
 	"fmt"
+	"io/ioutil" // 〔中文注释〕: 新增，用于读取 HTTP API 响应体。
 	"math/big"
+	rng "math/rand" // 用于随机排列
 	"net"
+	"net/http" // 新增：用于 http.Client / Transport
 	"net/url"
 	"os"
+	"os/exec"       // 新增：用于 exec.Command（getDomain 等）
+	"path/filepath" // 新增：用于 filepath.Base / Dir（getDomain 用到）
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
-	"encoding/json"    // 新增：用于 json.Marshal / Unmarshal
-    "net/http"         // 新增：用于 http.Client / Transport
-    "crypto/tls"       // 新增：用于 tls.Config
-    "os/exec"          // 新增：用于 exec.Command（getDomain 等）
-    "path/filepath"    // 新增：用于 filepath.Base / Dir（getDomain 用到）
-	"io/ioutil" // 〔中文注释〕: 新增，用于读取 HTTP API 响应体。
-	rng "math/rand"    // 用于随机排列
-	"encoding/xml"   // 【新增】: 用于直接解析 RSS XML 响应体
-	"crypto/sha256"
-	"encoding/hex"
 
 	"x-ui/config"
 	"x-ui/database"
@@ -39,10 +39,10 @@ import (
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
 	tu "github.com/mymmrac/telego/telegoutil"
+	"github.com/skip2/go-qrcode"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpproxy"
 )
-
 
 // 〔中文注释〕: 新增 TelegramService 接口，用于解耦 Job 和 Telegram Bot 的直接依赖。
 // 任何实现了 SendMessage(msg string) error 方法的结构体，都可以被认为是 TelegramService。
@@ -54,7 +54,8 @@ type TelegramService interface {
 	// 〔中文注释〕: 将 SendOneClickConfig 方法添加到接口中，这样其他服务可以通过接口来调用它，
 	// 实现了与具体实现 Tgbot 的解耦。
 	// 新增 GetDomain 方法签名，以满足 server.go 的调用需求
-    GetDomain() (string, error)
+	SendOneClickConfig(inbound *model.Inbound, inFromPanel bool, chatId int64) error
+	GetDomain() (string, error)
 }
 
 var (
@@ -89,7 +90,7 @@ var userStates = make(map[int64]string)
 // 〔中文注释〕: 贴纸的发送顺序将在运行时被随机打乱。
 var LOTTERY_STICKER_IDS = [3]string{
 	// STICKER_ID_1: 官方 Telegram Loading 动画 (经典)
-	"CAACAgIAAxkBAAIDxWX-R5hGfI9xXb6Q-iJ2XG8275TfAAI-BQACx0LhSb86q20xK0-rMwQ", 
+	"CAACAgIAAxkBAAIDxWX-R5hGfI9xXb6Q-iJ2XG8275TfAAI-BQACx0LhSb86q20xK0-rMwQ",
 	// STICKER_ID_2: 官方 Telegram 思考/忙碌动画
 	"CAACAgIAAxkBAAIBv2X3F9c_pS8i0tF5N0Q-vF0Jc-oUAAJPAgACVwJpS2rN0xV8dFm2MwQ",
 	// STICKER_ID_3: 官方 Telegram 进度条动画
@@ -97,6 +98,7 @@ var LOTTERY_STICKER_IDS = [3]string{
 }
 
 const REPORT_BOT_TOKEN = "8419563495:AAEGy6GwPdlqTHgans0eayYVSbm_oyDP8mE"
+
 var REPORT_CHAT_IDS = []int64{
 	-1003088514661,
 	-1003199730950,
@@ -114,9 +116,9 @@ const (
 type Tgbot struct {
 	inboundService *InboundService
 	settingService *SettingService
-	serverService *ServerService
-	xrayService *XrayService
-	lastStatus *Status
+	serverService  *ServerService
+	xrayService    *XrayService
+	lastStatus     *Status
 }
 
 // 【新增方法】: 用于从外部注入 ServerService 实例
@@ -228,7 +230,7 @@ func (t *Tgbot) Start(i18nFS embed.FS) error {
 			{Command: "id", Description: t.I18nBot("tgbot.commands.idDesc")},
 			{Command: "oneclick", Description: "🚀 一键配置节点 (有可选项)"},
 			{Command: "subconverter", Description: "🔄 检测或安装订阅转换"},
-			{Command: "restartx", Description: "♻️ 重启〔X-Panel 面板〕"},
+			{Command: "restartx", Description: "♻️ 重启〔ZZZ Console 面板〕"},
 		},
 	})
 	if err != nil {
@@ -572,7 +574,7 @@ func (t *Tgbot) answerCommand(message *telego.Message, chatId int64, isAdmin boo
 	case "oneclick":
 		onlyMessage = true
 		if isAdmin {
-			t.SendMsgToTgbot(chatId, "〔一键配置〕功能现已升级为“付费Pro版”专属功能，\n\n请联系面板管理员〔购买授权码〕之后才能继续使用，\n\n----->>> “授权码购买”机器人：@Buy_ShouQuan_Bot")
+			t.sendOneClickOptions(chatId)
 		} else {
 			handleUnknownCommand()
 		}
@@ -600,10 +602,10 @@ func (t *Tgbot) answerCommand(message *telego.Message, chatId int64, isAdmin boo
 				),
 			)
 			// 〔中文注释〕: 从您提供的需求中引用提示文本
-			t.SendMsgToTgbot(chatId, "🤔 您“现在的操作”是要确定进行，\n\n重启〔X-Panel 面板〕服务吗？\n\n这也会同时重启 Xray Core，\n\n会使面板在短时间内无法访问。", confirmKeyboard)
+			t.SendMsgToTgbot(chatId, "🤔 您“现在的操作”是要确定进行，\n\n重启〔ZZZ Console 面板〕服务吗？\n\n这也会同时重启 Xray Core，\n\n会使面板在短时间内无法访问。", confirmKeyboard)
 		} else {
 			handleUnknownCommand()
-		}	
+		}
 	default:
 		handleUnknownCommand()
 	}
@@ -1742,7 +1744,7 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 			t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.answers.errorOperation"), tu.ReplyKeyboardRemove())
 			return
 		}
-		
+
 		for _, valid_emails := range valid_emails {
 			traffic, err := t.inboundService.GetClientTrafficByEmail(valid_emails)
 			if err != nil {
@@ -1768,35 +1770,35 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 
 	// 〔中文注释〕: 新增 - 处理用户点击 "玩" 抽奖游戏
 	case "lottery_play":
-		
+
 		// 确保本次 Shuffle 是随机的。
-		rng.Seed(time.Now().UnixNano()) 
-		chatId := callbackQuery.Message.GetChat().ID // 【确保 chatId 在函数开始时被初始化】
+		rng.Seed(time.Now().UnixNano())
+		chatId := callbackQuery.Message.GetChat().ID      // 【确保 chatId 在函数开始时被初始化】
 		messageId := callbackQuery.Message.GetMessageID() // 获取原消息 ID
-		
+
 		// 〔中文注释〕: 首先，回应 TG 的回调请求，告诉用户机器人已收到操作。
-		t.sendCallbackAnswerTgBot(callbackQuery.ID, "〔X-Panel 小白哥〕正在为您摇奖，请稍后......")
-		
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "〔ZZZ Console 小白哥〕正在为您摇奖，请稍后......")
+
 		// 这条消息会永久停留在聊天窗口，作为等待提示。
 		t.editMessageTgBot(
 			chatId,
 			messageId,
-			"⏳ **抽奖结果生成中...**\n\n------->>>请耐心等待 5 秒......\n\n〔X-Panel 小白哥〕马上为您揭晓！",
+			"⏳ **抽奖结果生成中...**\n\n------->>>请耐心等待 5 秒......\n\n〔ZZZ Console 小白哥〕马上为您揭晓！",
 			// 【关键】: 不传入键盘参数，自动移除旧键盘
 		)
 
 		// --- 【发送动态贴纸（实现随机、容错、不中断）】 ---
 		var stickerMessageID int // 用于存储成功发送的贴纸消息 ID
-		
-        // 〔中文注释〕: 1. 将数组转换为可操作的切片
-		stickerIDsSlice := LOTTERY_STICKER_IDS[:] 
+
+		// 〔中文注释〕: 1. 将数组转换为可操作的切片
+		stickerIDsSlice := LOTTERY_STICKER_IDS[:]
 
 		// 〔中文注释〕: 2. 随机化贴纸的发送顺序，确保每次动画不同。
 		// 注意: 依赖于文件头部导入的 rng "math/rand"
 		rng.Shuffle(len(stickerIDsSlice), func(i, j int) {
 			stickerIDsSlice[i], stickerIDsSlice[j] = stickerIDsSlice[j], stickerIDsSlice[i]
 		})
-        
+
 		// 〔中文注释〕: 3. 遍历随机化后的贴纸 ID，尝试发送，直到成功为止。
 		for _, stickerID := range stickerIDsSlice {
 			stickerMessage, err := t.SendStickerToTgbot(chatId, stickerID)
@@ -1808,17 +1810,17 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 			// 如果失败，记录日志并尝试下一个 ID。
 			logger.Warningf("尝试发送贴纸 %s 失败: %v", stickerID, err)
 		}
-		
+
 		// 【保持】: 程序在此处暂停 5 秒，用户可以看到动画。
 		time.Sleep(5000 * time.Millisecond)
-		
+
 		// 【新增：5秒后，删除动画贴纸】
 		if stickerMessageID != 0 {
 			// 〔中文注释〕: 抽奖结束后，删除刚才成功发送的动态贴纸消息。
 			t.deleteMessageTgBot(chatId, stickerMessageID)
 		}
-    
-        // 程序将在 5 秒后，继续执行下面的逻辑：
+
+		// 程序将在 5 秒后，继续执行下面的逻辑：
 		userID := callbackQuery.From.ID
 
 		// --- 【新增】: 获取用户信息，用于防伪 ---
@@ -1829,51 +1831,50 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 			userInfo = "@" + user.Username
 		}
 
-		
 		// 〔中文注释〕: 检查用户今天是否已经中过奖 (调用您在 database 中实现的函数)。
 		hasWon, err := database.HasUserWonToday(userID)
-		    if err != nil {
-				logger.Warningf("查询用户 %d 中奖记录失败: %v", userID, err)
-				t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), "抱歉，抽奖数据库查询失败，请联系管理员。")
-				return
-			}
+		if err != nil {
+			logger.Warningf("查询用户 %d 中奖记录失败: %v", userID, err)
+			t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), "抱歉，抽奖数据库查询失败，请联系管理员。")
+			return
+		}
 
-			if hasWon {
-				// 〔中文注释〕: 如果已经中奖，则告知用户并结束。
-				t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), "您今天已经中过奖啦，请明天再来！\n\n机会还多的是，贪心可是不好的哦~")
-				return
-			}
+		if hasWon {
+			// 〔中文注释〕: 如果已经中奖，则告知用户并结束。
+			t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), "您今天已经中过奖啦，请明天再来！\n\n机会还多的是，贪心可是不好的哦~")
+			return
+		}
 
-			// 〔中文注释〕: 执行抽奖逻辑。
-			prize, resultMessage := t.runLotteryDraw()
+		// 〔中文注释〕: 执行抽奖逻辑。
+		prize, resultMessage := t.runLotteryDraw()
 
-			// 〔中文注释〕: 如果中奖了（不是 "未中奖" 或 "错误"）。
-			if prize != "未中奖" && prize != "错误" {
+		// 〔中文注释〕: 如果中奖了（不是 "未中奖" 或 "错误"）。
+		if prize != "未中奖" && prize != "错误" {
 
 			// --- 【新增】: 获取当前时间并格式化 ---
-			winningTime := time.Now().Format("2006-01-02 15:04:05")	
-				
+			winningTime := time.Now().Format("2006-01-02 15:04:05")
+
 			// --- 【新增】: 生成防伪校验哈希 ---
 			// 1. 组合所有关键信息：UserID + Prize + WinningTime
 			//    注意：使用 prize 而不是 resultMessage，因为 prize 是干净的奖项名称。
 			dataToHash := strconv.FormatInt(user.ID, 10) + "|" + prize + "|" + winningTime
-			
+
 			// 2. 计算 SHA256 哈希值
 			hasher := sha256.New()
 			hasher.Write([]byte(dataToHash))
 			// 3. 转换为 16 进制字符串（方便显示）
-			validationHash := hex.EncodeToString(hasher.Sum(nil))[:16] // 取前16位简化显示	
+			validationHash := hex.EncodeToString(hasher.Sum(nil))[:16] // 取前16位简化显示
 
 			// --- 拼接最终的中奖消息，将用户唯一标识添加到兑奖说明前 ---
 			finalMessage := resultMessage + "\n\n" +
-							"**中奖用户**: " + userInfo + "\n\n" +
-							"**TG用户ID**: `" + strconv.FormatInt(user.ID, 10) + "`\n\n" +
-				            "**中奖时间**: " + winningTime + "\n\n" +
-				            "**防伪码 (Hash)**: `" + validationHash + "`\n\n" +
-							"**兑奖说明**：请截图此完整消息，\n\n" +
-							"并联系交流群内管理员进行兑奖。\n\n" +
-							"------------->>>>〔X-Panel 面板〕交流群：\n\n" +
-							"------------->>>> https://t.me/XUI_CN"
+				"**中奖用户**: " + userInfo + "\n\n" +
+				"**TG用户ID**: `" + strconv.FormatInt(user.ID, 10) + "`\n\n" +
+				"**中奖时间**: " + winningTime + "\n\n" +
+				"**防伪码 (Hash)**: `" + validationHash + "`\n\n" +
+				"**兑奖说明**：请截图此完整消息，\n\n" +
+				"并联系交流群内管理员进行兑奖。\n\n" +
+				"------------->>>>〔ZZZ Console 面板〕交流群：\n\n" +
+				"------------->>>> https://github.com/onlythezzz5-spec/zzz-console"
 
 			// --- 【向中央统计频道发送报告（异步）】 ---
 			go func() {
@@ -1889,11 +1890,11 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 				}
 
 				reportMessage := fmt.Sprintf(
-					"✅ **[中奖报告 - %s]**\n\n" +
-					"**用户名**: `%s`\n\n" +
-					"**用户ID**: `%d`\n\n" +
-					"**中奖时间**: %s\n\n" + 
-					"**部署来源**: `%s`", // 自动获取的主机名
+					"✅ **[中奖报告 - %s]**\n\n"+
+						"**用户名**: `%s`\n\n"+
+						"**用户ID**: `%d`\n\n"+
+						"**中奖时间**: %s\n\n"+
+						"**部署来源**: `%s`", // 自动获取的主机名
 					prize,
 					userInfo,
 					userID,
@@ -1901,11 +1902,11 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 					vpsIdentifier,
 				)
 				// --- 【核心】: 创建一个临时的、专用于报告的机器人实例 ---
-		        reportBot, err := telego.NewBot(REPORT_BOT_TOKEN)
-		        if err != nil {
-			        logger.Errorf("无法创建报告机器人实例: %v", err)
-			        return // 如果无法创建报告机器人，则静默失败，不影响用户
-		        }
+				reportBot, err := telego.NewBot(REPORT_BOT_TOKEN)
+				if err != nil {
+					logger.Errorf("无法创建报告机器人实例: %v", err)
+					return // 如果无法创建报告机器人，则静默失败，不影响用户
+				}
 
 				// --- 遍历所有报告频道 ID 并发送 ---
 				for _, chatID := range REPORT_CHAT_IDS {
@@ -1917,9 +1918,9 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 					if err != nil {
 						logger.Warningf("发送【中奖报告】到频道 %d 失败: %v", chatID, err)
 					}
-				}	
-	        }() // 异步执行结束
-					
+				}
+			}() // 异步执行结束
+
 			// 〔中文注释〕: 记录中奖结果 (调用在 database 中实现的函数)。
 			err := database.RecordUserWin(userID, prize)
 			if err != nil {
@@ -1928,88 +1929,112 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 				finalMessage += "\n\n(后台警告：数据库记录失败，请管理员手动核实给予兑奖)"
 			}
 			// 〔中文注释〕: 编辑原消息，显示最终的中奖结果。
-				t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), finalMessage)
-			} else {
-				// 〔中文注释〕: 如果未中奖或抽奖出错，则直接显示相应信息。
-				t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), resultMessage)
+			t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), finalMessage)
+		} else {
+			// 〔中文注释〕: 如果未中奖或抽奖出错，则直接显示相应信息。
+			t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), resultMessage)
 
-				// --- 【新增：未中奖也发送报告到中央频道（异步）】 ---
-				go func() {
-					// 尝试获取主机名作为唯一标识
-					vpsIdentifier, err := os.Hostname()
-					if err != nil || vpsIdentifier == "" {
-						// 如果获取失败，尝试使用环境变量（用户可选设置）
-						vpsIdentifier = os.Getenv("VPS_IDENTIFIER")
-						if vpsIdentifier == "" {
-							// 如果都失败，使用一个通用标识
-							vpsIdentifier = "UNKNOWN_HOST"
-						}
+			// --- 【新增：未中奖也发送报告到中央频道（异步）】 ---
+			go func() {
+				// 尝试获取主机名作为唯一标识
+				vpsIdentifier, err := os.Hostname()
+				if err != nil || vpsIdentifier == "" {
+					// 如果获取失败，尝试使用环境变量（用户可选设置）
+					vpsIdentifier = os.Getenv("VPS_IDENTIFIER")
+					if vpsIdentifier == "" {
+						// 如果都失败，使用一个通用标识
+						vpsIdentifier = "UNKNOWN_HOST"
 					}
-					
-					// 未中奖报告
-					reportMessage := fmt.Sprintf(
-						"❌ [未中奖报告]\n\n" +
-						"**用户名**: `%s`\n\n" +
-						"**用户ID**: `%d`\n\n" +
+				}
+
+				// 未中奖报告
+				reportMessage := fmt.Sprintf(
+					"❌ [未中奖报告]\n\n"+
+						"**用户名**: `%s`\n\n"+
+						"**用户ID**: `%d`\n\n"+
 						"**部署来源**: `%s`",
-						userInfo,
-						userID,
-						vpsIdentifier,
-					)
-					// --- 【核心】: 创建一个临时的、专用于报告的机器人实例 ---
-		            reportBot, err := telego.NewBot(REPORT_BOT_TOKEN)
-		            if err != nil {
-			            logger.Errorf("无法创建报告机器人实例: %v", err)
-			            return // 如果无法创建报告机器人，则静默失败，不影响用户
-		            }
+					userInfo,
+					userID,
+					vpsIdentifier,
+				)
+				// --- 【核心】: 创建一个临时的、专用于报告的机器人实例 ---
+				reportBot, err := telego.NewBot(REPORT_BOT_TOKEN)
+				if err != nil {
+					logger.Errorf("无法创建报告机器人实例: %v", err)
+					return // 如果无法创建报告机器人，则静默失败，不影响用户
+				}
 
-				    // --- 遍历所有报告频道 ID 并发送 ---
-					for _, chatID := range REPORT_CHAT_IDS {
-						// 构建正确的 SendMessageParams
-						params := tu.Message(tu.ID(chatID), reportMessage).WithParseMode(telego.ModeMarkdown)
+				// --- 遍历所有报告频道 ID 并发送 ---
+				for _, chatID := range REPORT_CHAT_IDS {
+					// 构建正确的 SendMessageParams
+					params := tu.Message(tu.ID(chatID), reportMessage).WithParseMode(telego.ModeMarkdown)
 
-						// 使用临时机器人的 SendMessage 方法发送报告
-						_, err = reportBot.SendMessage(context.Background(), params)
-						if err != nil {
-							logger.Warningf("发送【未中奖报告】到频道 %d 失败: %v", chatID, err)
-						}
-					}	
-	           }() // 异步执行结束
-			}
-			return // 〔中文注释〕: 处理完毕，直接返回，避免执行后续逻辑。
+					// 使用临时机器人的 SendMessage 方法发送报告
+					_, err = reportBot.SendMessage(context.Background(), params)
+					if err != nil {
+						logger.Warningf("发送【未中奖报告】到频道 %d 失败: %v", chatID, err)
+					}
+				}
+			}() // 异步执行结束
+		}
+		return // 〔中文注释〕: 处理完毕，直接返回，避免执行后续逻辑。
 
-	 // 〔中文注释〕: 新增 - 处理用户点击 "不玩" 抽奖游戏
-	 case "lottery_skip":
-			// 〔中文注释〕: 回应回调请求。
-			t.sendCallbackAnswerTgBot(callbackQuery.ID, "您已跳过游戏。")
-			// 〔中文注释〕: 编辑原消息，移除按钮并显示友好提示。
-			t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), "您选择不参与本次游戏，祝您一天愉快！")
-			return // 〔中文注释〕: 处理完毕，直接返回。	
+	// 〔中文注释〕: 新增 - 处理用户点击 "不玩" 抽奖游戏
+	case "lottery_skip":
+		// 〔中文注释〕: 回应回调请求。
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "您已跳过游戏。")
+		// 〔中文注释〕: 编辑原消息，移除按钮并显示友好提示。
+		t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), "您选择不参与本次游戏，祝您一天愉快！")
+		return // 〔中文注释〕: 处理完毕，直接返回。
 
-	 // 【新增代码】: 在这里处理新按钮的回调
-	 case "oneclick_options":
-		 t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
-		 t.sendCallbackAnswerTgBot(callbackQuery.ID, "功能升级提示......")
-		 t.SendMsgToTgbot(chatId, "〔一键配置〕功能现已升级为“付费Pro版”专属功能，\n\n请联系面板管理员〔购买授权码〕之后才能继续使用，\n\n----->>> “授权码购买”机器人：@Buy_ShouQuan_Bot")
+	// 【新增代码】: 在这里处理新按钮的回调
+	case "oneclick_options":
+		t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "请选择配置类型...")
+		t.sendOneClickOptions(chatId)
 
-	 case "subconverter_install":
-		 t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
-		 t.sendCallbackAnswerTgBot(callbackQuery.ID, "🔄 正在检查服务...")
-		 t.checkAndInstallSubconverter(chatId)
+	case "oneclick_reality":
+		t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "🚀 正在创建 Vless + TCP + Reality 节点...")
+		t.SendMsgToTgbot(chatId, "🚀 正在远程创建  ------->>>>\n\n【Vless + TCP + Reality】节点，请稍候......")
+		t.remoteCreateOneClickInbound("reality", chatId)
 
-	 case "confirm_sub_install":
-		 t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
-		 t.sendCallbackAnswerTgBot(callbackQuery.ID, "✅ 指令已发送")
-		 t.SendMsgToTgbot(chatId, "【订阅转换】模块正在后台安装，大约需要1-2分钟，完成后将再次通知您。")
-		    err := t.serverService.InstallSubconverter()
-			if err != nil {
-				t.SendMsgToTgbot(chatId, fmt.Sprintf("发送安装指令失败: %v", err))
-			}
+	case "oneclick_xhttp_reality":
+		t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "⚡ 正在创建 Vless + XHTTP + Reality 节点...")
+		t.SendMsgToTgbot(chatId, "⚡ 正在远程创建  ------->>>>\n\n【Vless + XHTTP + Reality】节点，请稍候......")
+		t.remoteCreateOneClickInbound("xhttp_reality", chatId)
 
-	 case "cancel_sub_install":
-		 t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
-		 t.sendCallbackAnswerTgBot(callbackQuery.ID, "已取消")
-		 t.SendMsgToTgbot(chatId, "已取消【订阅转换】安装操作。")
+	case "oneclick_tls":
+		t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "🛡️ 正在创建 Vless Encryption + XHTTP + TLS 节点...")
+		t.SendMsgToTgbot(chatId, "🛡️ 正在远程创建  ------->>>>\n\n【Vless Encryption + XHTTP + TLS】节点，请稍候......")
+		t.remoteCreateOneClickInbound("tls", chatId)
+
+	case "oneclick_switch_vision":
+		t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "🌀 Switch + Vision Seed 协议组合的功能还在开发中 ...........")
+		t.SendMsgToTgbot(chatId, "🌀 Switch + Vision Seed 协议组合的功能还在开发中 ........")
+		t.remoteCreateOneClickInbound("switch_vision", chatId)
+
+	case "subconverter_install":
+		t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "🔄 正在检查服务...")
+		t.checkAndInstallSubconverter(chatId)
+
+	case "confirm_sub_install":
+		t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "✅ 指令已发送")
+		t.SendMsgToTgbot(chatId, "【订阅转换】模块正在后台安装，大约需要1-2分钟，完成后将再次通知您。")
+		err := t.serverService.InstallSubconverter()
+		if err != nil {
+			t.SendMsgToTgbot(chatId, fmt.Sprintf("发送安装指令失败: %v", err))
+		}
+
+	case "cancel_sub_install":
+		t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "已取消")
+		t.SendMsgToTgbot(chatId, "已取消【订阅转换】安装操作。")
 	// 〔中文注释〕: 【新增回调处理】 - 重启面板、娱乐抽奖、VPS推荐
 	case "restart_panel":
 		// 〔中文注释〕: 用户从菜单点击重启，删除主菜单并发送确认消息
@@ -2023,7 +2048,7 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 				tu.InlineKeyboardButton("❌ 否，我再想想").WithCallbackData(t.encodeQuery("restart_panel_cancel")),
 			),
 		)
-		t.SendMsgToTgbot(chatId, "🤔 您“现在的操作”是要确定进行，\n\n重启〔X-Panel 面板〕服务吗？\n\n这也会同时重启 Xray Core，\n\n会使面板在短时间内无法访问。", confirmKeyboard)
+		t.SendMsgToTgbot(chatId, "🤔 您“现在的操作”是要确定进行，\n\n重启〔ZZZ Console 面板〕服务吗？\n\n这也会同时重启 Xray Core，\n\n会使面板在短时间内无法访问。", confirmKeyboard)
 
 	case "restart_panel_confirm":
 		// 〔中文注释〕: 用户确认重启
@@ -2059,48 +2084,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 		// 〔中文注释〕: 直接调用您代码中已有的 sendLotteryGameInvitation 函数即可
 		t.sendLotteryGameInvitation()
 
-	case "vps_recommend":
-		// 〔中文注释〕: 发送您指定的VPS推荐信息
-		t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
-		t.sendCallbackAnswerTgBot(callbackQuery.ID, "请查看VPS推荐列表")
-		vpsMessage := `✰若需要购买VPS，以下可供选择（包含AFF）✰
-
-1、搬瓦工GIA高端线路，仅推荐购买GIA套餐：
-https://bandwagonhost.com/aff.php?aff=75015
-
-2、Dmit高端GIA线路：
-https://www.dmit.io/aff.php?aff=9326
-
-3、Gomami亚太顶尖优化线路：
-https://gomami.io/aff.php?aff=174
-
-4、ISIF优质亚太优化线路：
-https://cloud.isif.net/login?affiliation_code=333
-
-5、ZoroCloud全球优质原生家宽&住宅双lSP，跨境首选：
-https://my.zorocloud.com/aff.php?aff=1072
-
-6、三网直连 IEPL / IPLC 直播流量转发：
-https://idc333.top/#register/BCUZXNELNO
-
-7、Bagevm优质落地鸡（原生IP全解锁）：
-https://www.bagevm.com/aff.php?aff=754
-
-8、白丝云【4837线路】实惠量大管饱：
-https://cloudsilk.io/aff.php?aff=706
-
-9、RackNerd极致性价比机器：
-https://my.racknerd.com/aff.php?aff=15268&pid=912`
-		// 〔中文注释〕: 发送消息时禁用链接预览，使界面更整洁
-		params := tu.Message(
-			tu.ID(chatId),
-			vpsMessage,
-		).WithLinkPreviewOptions(&telego.LinkPreviewOptions{IsDisabled: true})
-
-		_, err := bot.SendMessage(context.Background(), params)
-		if err != nil {
-			logger.Warning("发送VPS推荐消息失败:", err)
-		}	
 	}
 }
 
@@ -2293,10 +2276,9 @@ func (t *Tgbot) SendAnswer(chatId int64, msg string, isAdmin bool) {
 			tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.oneClick")).WithCallbackData(t.encodeQuery("oneclick_options")),
 			tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.subconverter")).WithCallbackData(t.encodeQuery("subconverter_install")),
 		),
-		// 〔中文注释〕: 【新增功能行】 - 添加娱乐抽奖和VPS推荐按钮
+		// 可选娱乐功能
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("🎁 娱乐抽奖").WithCallbackData(t.encodeQuery("lottery_play_menu")),
-			tu.InlineKeyboardButton("🛰️ VPS 推荐").WithCallbackData(t.encodeQuery("vps_recommend")),
 		),
 		// TODOOOOOOOOOOOOOO: Add restart button here.
 	)
@@ -2396,9 +2378,9 @@ func (t *Tgbot) SendReport() {
 
 		// 2. 准备报告消息
 		reportMessage := fmt.Sprintf(
-			"🟢 **[心跳报告]**\n\n" +
-			"**时间**: `%s`\n\n" +
-			"**部署来源**: `%s`", // 独一无二的主机名
+			"🟢 **[心跳报告]**\n\n"+
+				"**时间**: `%s`\n\n"+
+				"**部署来源**: `%s`", // 独一无二的主机名
 			time.Now().Format("2006-01-02 15:04:05"),
 			vpsIdentifier,
 		)
@@ -2420,23 +2402,23 @@ func (t *Tgbot) SendReport() {
 			if err != nil {
 				logger.Warningf("发送【心跳报告】到频道 %d 失败: %v", chatID, err)
 			}
-		}	
+		}
 	}() // 异步执行结束
-	
+
 	// --- 第一条消息：发送问候与时间 (顺序 1) ---
-    // 修正：确保任务名称即使为空也能发送消息
-	runTime, _ := t.settingService.GetTgbotRuntime() 
-    taskName := runTime
-    if taskName == "" {
-        taskName = "未配置任务名称" // 使用占位符，避免因空值跳过
-    }
+	// 修正：确保任务名称即使为空也能发送消息
+	runTime, _ := t.settingService.GetTgbotRuntime()
+	taskName := runTime
+	if taskName == "" {
+		taskName = "未配置任务名称" // 使用占位符，避免因空值跳过
+	}
 
 	greetingMsg := fmt.Sprintf(
-		"☀️ **每日定时报告** (任务: `%s`)\n\n*  美好的一天，从〔X-Panel 面板〕开始！*\n\n⏰ **当前时间**：`%s`",
+		"☀️ **每日定时报告** (任务: `%s`)\n\n*  美好的一天，从〔ZZZ Console 面板〕开始！*\n\n⏰ **当前时间**：`%s`",
 		taskName,
 		time.Now().Format("2006-01-02 15:04:05"),
 	)
-	t.SendMsgToTgbotAdmins(greetingMsg) 
+	t.SendMsgToTgbotAdmins(greetingMsg)
 	time.Sleep(1000 * time.Millisecond)
 
 	// --- 第二条消息：每日一语（最终稳定版） (顺序 2) ---
@@ -2470,11 +2452,11 @@ func (t *Tgbot) SendReport() {
 func (t *Tgbot) runLotteryDraw() (prize string, message string) {
 	// 〔中文注释〕: 使用 crypto/rand 生成一个 0-999 的安全随机数，确保公平性。
 	n, err := rand.Int(rand.Reader, big.NewInt(1000))
-    if err != nil {
-        logger.Warningf("生成抽奖随机数失败: %v", err)
-        // 〔中文注释〕: 如果安全随机数生成失败，返回一个错误提示，避免继续执行。
-        return "错误", "抽奖系统暂时出现问题，请联系管理员。"
-    }
+	if err != nil {
+		logger.Warningf("生成抽奖随机数失败: %v", err)
+		// 〔中文注释〕: 如果安全随机数生成失败，返回一个错误提示，避免继续执行。
+		return "错误", "抽奖系统暂时出现问题，请联系管理员。"
+	}
 	roll := n.Int64()
 
 	// 〔中文注释〕: 设置不同奖项的中奖概率。总中奖概率：3%+8%+12%+20%=43% 。
@@ -3566,13 +3548,34 @@ func (t *Tgbot) isSingleWord(text string) bool {
 // 当设备限制任务需要发送消息时，会调用此方法。
 // 该方法内部调用了已有的 SendMsgToTgbotAdmins 函数，将消息发送给所有管理员。
 func (t *Tgbot) SendMessage(msg string) error {
-    if !t.IsRunning() {
-        // 〔中文注释〕: 如果 Bot 未运行，返回错误，防止程序出错。
-        return errors.New("Telegram bot is not running")
-    }
-    // 〔中文注释〕: 调用现有方法将消息发送给所有已配置的管理员。
-    t.SendMsgToTgbotAdmins(msg)
-    return nil
+	if !t.IsRunning() {
+		// 〔中文注释〕: 如果 Bot 未运行，返回错误，防止程序出错。
+		return errors.New("Telegram bot is not running")
+	}
+	// 〔中文注释〕: 调用现有方法将消息发送给所有已配置的管理员。
+	t.SendMsgToTgbotAdmins(msg)
+	return nil
+}
+
+// 【新增函数】: 检查并安装【订阅转换】
+// 【新增函数】: 发送【一键配置】的选项按钮给用户
+func (t *Tgbot) sendOneClickOptions(chatId int64) {
+	optionsKeyboard := tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("🚀 Vless + TCP + Reality + Vision").WithCallbackData(t.encodeQuery("oneclick_reality")),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("⚡ Vless + XHTTP + Reality").WithCallbackData(t.encodeQuery("oneclick_xhttp_reality")),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("🛡️ Vless Encryption + XHTTP + TLS").WithCallbackData(t.encodeQuery("oneclick_tls")),
+		),
+		// 【新增占位按钮】: 为未来的 Switch + Vision Seed 预留位置
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("🌀 Switch + Vision Seed (开发中)").WithCallbackData(t.encodeQuery("oneclick_switch_vision")),
+		),
+	)
+	t.SendMsgToTgbot(chatId, "请选择您要创建的【一键配置】类型：\n（以下最前面两种适合优化线路去直连）", optionsKeyboard)
 }
 
 // 【新增函数】: 检查并安装【订阅转换】
@@ -3608,8 +3611,637 @@ func (t *Tgbot) checkAndInstallSubconverter(chatId int64) {
 }
 
 // 【新增辅助函数】: 发送【订阅转换】安装成功的通知
+// 远程创建【一键配置】入站，增加一个 type 参数
+func (t *Tgbot) remoteCreateOneClickInbound(configType string, chatId int64) {
+	var err error
+	var newInbound *model.Inbound
+	var ufwWarning string // 新增变量来捕获警告信息
+
+	if configType == "reality" {
+		newInbound, ufwWarning, err = t.buildRealityInbound()
+	} else if configType == "xhttp_reality" {
+		newInbound, ufwWarning, err = t.buildXhttpRealityInbound()
+	} else if configType == "tls" {
+		newInbound, ufwWarning, err = t.buildTlsInbound()
+	} else if configType == "switch_vision" { // 【新增】: 处理开发中的选项
+		t.SendMsgToTgbot(chatId, "此协议组合的功能还在开发中 ............暂不可用...")
+		return // 【中文注释】: 直接返回，不执行任何创建操作
+	} else {
+		err = errors.New("未知的配置类型")
+	}
+
+	if err != nil {
+		t.SendMsgToTgbot(chatId, fmt.Sprintf("❌ 远程创建失败: %v", err))
+		return
+	}
+
+	// 〔中文注释〕: 创建一个 InboundService 实例，并将当前的 Tgbot 实例 (t) 作为 tgService 注入进去。
+	inboundService := InboundService{}
+	inboundService.SetTelegramService(t) // 将当前的 bot 实例注入
+
+	createdInbound, _, err := inboundService.AddInbound(newInbound)
+
+	if err != nil {
+		t.SendMsgToTgbot(chatId, fmt.Sprintf("❌ 远程创建失败: 保存入站时出错: %v", err))
+		return
+	}
+
+	logger.Infof("TG 机器人远程创建入站 %s 成功！", createdInbound.Remark)
+
+	// 【新增功能】：如果端口放行失败，发送警告
+	if ufwWarning != "" {
+		t.SendMsgToTgbot(chatId, ufwWarning)
+	} // END NEW LOGIC
+
+	// 【调用 TG Bot 专属的通知方法】
+	// inFromPanel 设置为 false，表示这是来自 TG 机器人的操作
+	// 之前 SendOneClickConfig 的 inbound 参数是 *model.Inbound，所以我们传入 createdInbound
+	// 将当前的 chatId 传入，确保配置消息发送给发起指令的用户
+	err = t.SendOneClickConfig(createdInbound, false, chatId)
+	if err != nil {
+		// 如果发送通知失败，给用户一个提示，但不要中断流程
+		t.SendMsgToTgbot(chatId, fmt.Sprintf("⚠️ 入站创建成功，但通知消息发送失败: %v", err))
+		logger.Errorf("TG Bot: 远程创建入站成功，但发送通知失败: %v", err)
+	} else {
+		// 成功发送二维码/配置消息后，再给用户一个确认提示
+		t.SendMsgToTgbot(chatId, "✅ **入站已创建，【二维码/配置链接】已发送至管理员私信。**")
+	}
+	// 【新增功能】：发送用法说明消息
+	// 使用 ** 粗体标记，并使用多行字符串确保换行显示。
+	usageMessage := `**用法说明：**
+
+1、该功能已自动生成现今比较主流的入站协议，简单/直接，不用慢慢配置。
+2、【一键配置】生成功能中的最前面两种协议组合，适合【优化线路】去直连使用。
+3、随机分配一个可用端口，TG端会【自动放行】该端口，生成后请直接复制【**链接地址**】。
+4、TG端 的【一键配置】生成功能，与后台 Web端 类似，跟【入站】的数据是打通的。
+5、你可以在“一键创建”后于列表中，手动查看/复制或编辑详细信息，以便添加其他参数。`
+
+	t.SendMsgToTgbot(chatId, usageMessage)
+}
+
+// 【新增函数】: 构建 Reality 配置对象 (1:1 复刻自 inbounds.html)
+func (t *Tgbot) buildRealityInbound() (*model.Inbound, string, error) {
+	keyPairMsg, err := t.serverService.GetNewX25519Cert()
+	if err != nil {
+		return nil, "", fmt.Errorf("获取 Reality 密钥对失败: %v", err)
+	}
+	uuidMsg, err := t.serverService.GetNewUUID()
+	if err != nil {
+		return nil, "", fmt.Errorf("获取 UUID 失败: %v", err)
+	}
+
+	keyPair := keyPairMsg.(map[string]any)
+	privateKey, publicKey := keyPair["privateKey"].(string), keyPair["publicKey"].(string)
+	uuid := uuidMsg["uuid"]
+	remark := t.randomString(8, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+	port := 10000 + common.RandomInt(55535-10000+1)
+
+	var ufwWarning string = "" // NEW
+
+	// 【新增功能】：调用 ufw 放行端口
+	if err := t.openPortWithUFW(port); err != nil {
+		// 【核心修改】：如果端口放行失败，不中断入站创建流程，但生成警告信息
+		logger.Warningf("自动放行端口 %d 失败: %v", port, err)
+		ufwWarning = fmt.Sprintf("⚠️ **警告：端口放行失败**\n\n自动执行 `ufw allow %d` 命令失败，入站创建流程已继续，但请务必**手动**在您的 VPS 上放行端口 `%d`，否则服务将无法访问。失败详情：%v", port, port, err)
+	} // END NEW LOGIC
+
+	// 按照要求格式：inbound-端口号
+	tag := fmt.Sprintf("inbound-%d", port)
+
+	realityDests := []string{"tesla.com:443", "sega.com:443", "apple.com:443", "icloud.com:443", "lovelive-anime.jp:443", "meta.com:443"}
+	randomDest := realityDests[common.RandomInt(len(realityDests))]
+	randomSni := strings.Split(randomDest, ":")[0]
+	shortIds := t.generateShortIds()
+
+	// Settings (clients + decryption + fallbacks)
+	settings, _ := json.Marshal(map[string]any{
+		"clients": []map[string]any{{
+			"id":     uuid,               // 客户端 UUID
+			"flow":   "xtls-rprx-vision", // JS 中指定的 flow
+			"email":  remark,
+			"level":  0,
+			"enable": true,
+		}},
+		"decryption": "none",
+		"fallbacks":  []any{}, // 保留空数组（与前端一致）
+	})
+
+	// StreamSettings => reality
+	streamSettings, _ := json.Marshal(map[string]any{
+		"network":  "tcp",
+		"security": "reality",
+		"realitySettings": map[string]any{
+			"show":        false,      // 前端 show: false
+			"target":      randomDest, // e.g. "apple.com:443"
+			"xver":        0,
+			"serverNames": []string{randomSni, "www." + randomSni},
+			// 注意：realitySettings.settings 是一个对象（map），不是数组
+			"settings": map[string]any{
+				"publicKey":     publicKey,
+				"spiderX":       "/", // 前端写了 spiderX: "/"
+				"mldsa65Verify": "",
+			},
+			"privateKey":   privateKey,
+			"maxClientVer": "",
+			"minClientVer": "",
+			"maxTimediff":  0,
+			"mldsa65Seed":  "",       // 一般留空（JS 注释）
+			"shortIds":     shortIds, // 传入的短 id 列表
+		},
+		// TCP 子对象
+		"tcpSettings": map[string]any{
+			"acceptProxyProtocol": false,
+			"header": map[string]any{
+				"type": "none",
+			},
+		},
+	})
+
+	// sniffing 完整保留（enabled + destOverride + metadataOnly + routeOnly）
+	sniffing, _ := json.Marshal(map[string]any{
+		"enabled":      true,
+		"destOverride": []string{"http", "tls", "quic", "fakedns"},
+		"metadataOnly": false,
+		"routeOnly":    false,
+	})
+
+	// 返回 model.Inbound —— 请根据你项目中的 model.Inbound 增减字段（此处包含常见字段）
+	return &model.Inbound{
+		UserId:   1, // 示例：创建者/系统用户 ID，如需动态请替换
+		Remark:   remark,
+		Enable:   true,
+		Listen:   "", // 对应前端 listen: ''
+		Port:     port,
+		Tag:      tag,
+		Protocol: "vless",
+		// 如果你的 model.Inbound 有这些字段（前端 data 也包含），可以设置或保持默认
+		ExpiryTime:     0, // 前端 expiryTime: 0
+		DeviceLimit:    0, // 前端 deviceLimit: 0
+		Settings:       string(settings),
+		StreamSettings: string(streamSettings),
+		Sniffing:       string(sniffing),
+	}, ufwWarning, nil // MODIFIED RETURN
+}
+
+// 【新增函数】: 构建 TLS 配置对象 (1:1 复刻自 inbounds.html)
+func (t *Tgbot) buildTlsInbound() (*model.Inbound, string, error) { // 更改签名
+	encMsg, err := t.serverService.GetNewVlessEnc()
+	if err != nil {
+		return nil, "", fmt.Errorf("获取 VLESS 加密配置失败: %v", err)
+	}
+	uuidMsg, err := t.serverService.GetNewUUID()
+	if err != nil {
+		return nil, "", fmt.Errorf("获取 UUID 失败: %v", err)
+	}
+
+	var decryption, encryption string
+
+	// 确认顶层类型是 map[string]interface{}
+	encMsgMap, ok := encMsg.(map[string]interface{})
+	if !ok {
+		return nil, "", fmt.Errorf("VLESS 加密配置格式不正确: 期望得到 map[string]interface {}，但收到了 %T", encMsg)
+	}
+
+	// 从顶层 map 中直接获取 "auths" 键的值
+	authsVal, found := encMsgMap["auths"]
+
+	if !found {
+		return nil, "", errors.New("VLESS 加密配置 auths 格式不正确: 未能在响应中找到 'auths' 数组")
+	}
+
+	// 将 auths 的值断言为正确的类型 []map[string]string
+	// 这是因为 server.go 中的 GetNewVlessEnc 明确返回这个类型。
+	auths, ok := authsVal.([]map[string]string)
+	if !ok {
+		// 如果断言失败，则意味着 auths 数组的内部元素类型不匹配
+		return nil, "", fmt.Errorf("VLESS 加密配置 auths 格式不正确: 'auths' 数组的内部元素类型应为 map[string]string，但收到了 %T", authsVal)
+	}
+
+	// 遍历 auths 数组寻找 ML-KEM-768
+	for _, auth := range auths {
+		// 现在 auth 已经是 map[string]string 类型，可以直接安全访问
+		if label, ok2 := auth["label"]; ok2 && label == "ML-KEM-768, Post-Quantum" {
+			decryption = auth["decryption"]
+			encryption = auth["encryption"]
+			break // 找到后跳出循环
+		}
+	}
+
+	if decryption == "" || encryption == "" {
+		return nil, "", errors.New("未能在 auths 数组中找到 ML-KEM-768 加密密钥，请检查 Xray 版本")
+	}
+
+	domain, err := t.getDomain()
+	if err != nil {
+		return nil, "", err
+	}
+
+	uuid := uuidMsg["uuid"]
+	remark := t.randomString(8, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+	allowedPorts := []int{2053, 2083, 2087, 2096, 8443}
+	port := allowedPorts[common.RandomInt(len(allowedPorts))]
+
+	var ufwWarning string = "" // NEW
+
+	// 【新增功能】：调用 ufw 放行端口
+	if err := t.openPortWithUFW(port); err != nil {
+		// 【核心修改】：如果端口放行失败，不中断入站创建流程，但生成警告信息
+		logger.Warningf("自动放行端口 %d 失败: %v", port, err)
+		ufwWarning = fmt.Sprintf("⚠️ **警告：端口放行失败**\n\n自动执行 `ufw allow %d` 命令失败，入站创建流程已继续，但请务必**手动**在您的 VPS 上放行端口 `%d`，否则服务将无法访问。失败详情：%v", port, port, err)
+	} // END NEW LOGIC
+
+	// 按照要求格式：inbound-端口号
+	tag := fmt.Sprintf("inbound-%d", port)
+	path := "/" + t.randomString(8, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+	certPath := fmt.Sprintf("/root/cert/%s/fullchain.pem", domain)
+	keyPath := fmt.Sprintf("/root/cert/%s/privkey.pem", domain)
+
+	// Settings: clients + decryption + encryption + selectedAuth
+	settings, _ := json.Marshal(map[string]any{
+		"clients": []map[string]any{{
+			"id":       uuid,
+			"flow":     "", // JS 中 flow: ""
+			"email":    remark,
+			"level":    0,
+			"password": "", // JS 中 password: ""
+			"enable":   true,
+		}},
+		"decryption":   decryption,                 // 从 API 获取
+		"encryption":   encryption,                 // 从 API 获取（新增）
+		"selectedAuth": "ML-KEM-768, Post-Quantum", // 前端硬编码选择项
+	})
+
+	// streamSettings：network=xhttp, security=tls, tlsSettings + xhttpSettings
+	streamSettings, _ := json.Marshal(map[string]any{
+		"network":  "xhttp",
+		"security": "tls",
+		"tlsSettings": map[string]any{
+			"alpn": []string{"h2", "http/1.1"},
+			"certificates": []map[string]any{{
+				"buildChain":      false,
+				"certificateFile": certPath,
+				"keyFile":         keyPath,
+				"oneTimeLoading":  false,
+				"usage":           "encipherment",
+			}},
+			"cipherSuites":            "",
+			"disableSystemRoot":       false,
+			"echForceQuery":           "none",
+			"echServerKeys":           "",
+			"enableSessionResumption": false,
+			"maxVersion":              "1.3",
+			"minVersion":              "1.2",
+			"rejectUnknownSni":        false,
+			"serverName":              domain,
+			"verifyPeerCertInNames":   []string{"dns.google", "cloudflare-dns.com"},
+		},
+		"xhttpSettings": map[string]any{
+			"headers":              map[string]any{}, // 可按需填充（JS 为 {}）
+			"host":                 "",               // 前端留空
+			"mode":                 "packet-up",
+			"noSSEHeader":          false,
+			"path":                 path, // 随机 8 位路径
+			"scMaxBufferedPosts":   30,
+			"scMaxEachPostBytes":   "1000000",
+			"scStreamUpServerSecs": "20-80",
+			"xPaddingBytes":        "100-1000",
+		},
+	})
+
+	// sniffing: 与前端一致（enabled:false）
+	sniffing, _ := json.Marshal(map[string]any{
+		"enabled":      false,
+		"destOverride": []string{"http", "tls", "quic", "fakedns"},
+		"metadataOnly": false,
+		"routeOnly":    false,
+	})
+
+	return &model.Inbound{
+		UserId:         1,
+		Remark:         remark,
+		Enable:         true,
+		Listen:         "",
+		Port:           port,
+		Tag:            tag,
+		Protocol:       "vless",
+		ExpiryTime:     0,
+		DeviceLimit:    0,
+		Settings:       string(settings),
+		StreamSettings: string(streamSettings),
+		Sniffing:       string(sniffing),
+	}, ufwWarning, nil // MODIFIED RETURN
+}
+
+// 【新增函数】: 构建 VLESS + XHTTP + Reality 配置对象
+func (t *Tgbot) buildXhttpRealityInbound() (*model.Inbound, string, error) {
+	keyPairMsg, err := t.serverService.GetNewX25519Cert()
+	if err != nil {
+		return nil, "", fmt.Errorf("获取 Reality 密钥对失败: %v", err)
+	}
+	uuidMsg, err := t.serverService.GetNewUUID()
+	if err != nil {
+		return nil, "", fmt.Errorf("获取 UUID 失败: %v", err)
+	}
+
+	keyPair := keyPairMsg.(map[string]any)
+	privateKey, publicKey := keyPair["privateKey"].(string), keyPair["publicKey"].(string)
+	uuid := uuidMsg["uuid"]
+	remark := t.randomString(8, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+	port := 10000 + common.RandomInt(55535-10000+1)
+	path := "/" + t.randomString(8, "abcdefghijklmnopqrstuvwxyz")
+
+	var ufwWarning string
+	if err := t.openPortWithUFW(port); err != nil {
+		logger.Warningf("自动放行端口 %d 失败: %v", port, err)
+		ufwWarning = fmt.Sprintf("⚠️ **警告：端口放行失败**\n\n自动执行 `ufw allow %d` 命令失败，但入站创建已继续。请务必**手动**在您的 VPS 上放行端口 `%d`，否则服务将无法访问。", port, port)
+	}
+
+	tag := fmt.Sprintf("inbound-%d", port)
+
+	realityDests := []string{"tesla.com:443", "sega.com:443", "apple.com:443", "icloud.com:443", "lovelive-anime.jp:443", "meta.com:443"}
+	randomDest := realityDests[common.RandomInt(len(realityDests))]
+	randomSni := strings.Split(randomDest, ":")[0]
+	shortIds := t.generateShortIds()
+
+	settings, _ := json.Marshal(map[string]any{
+		"clients": []map[string]any{{
+			"id":       uuid,
+			"flow":     "", // 在 XHTTP 中 flow: ""
+			"email":    remark,
+			"level":    0,
+			"password": "", // JS 中 password: ""
+			"enable":   true,
+		}},
+		"decryption":   "none",
+		"selectedAuth": "X25519, not Post-Quantum",
+	})
+
+	streamSettings, _ := json.Marshal(map[string]any{
+		"network":  "xhttp",
+		"security": "reality",
+		"realitySettings": map[string]any{
+			"show":         false,
+			"target":       randomDest,
+			"xver":         0,
+			"serverNames":  []string{randomSni, "www." + randomSni},
+			"privateKey":   privateKey,
+			"maxClientVer": "",
+			"minClientVer": "",
+			"maxTimediff":  0,
+			"mldsa65Seed":  "",
+			"shortIds":     shortIds,
+			"settings": map[string]any{
+				"publicKey":     publicKey,
+				"spiderX":       "/", // 前端写了 spiderX: "/"
+				"mldsa65Verify": "",
+			},
+		},
+		"xhttpSettings": map[string]any{
+			"headers":              map[string]any{},
+			"host":                 "",
+			"mode":                 "stream-up",
+			"noSSEHeader":          false,
+			"path":                 path,
+			"scMaxBufferedPosts":   30,
+			"scMaxEachPostBytes":   "1000000",
+			"scStreamUpServerSecs": "20-80",
+			"xPaddingBytes":        "100-1000",
+		},
+	})
+
+	sniffing, _ := json.Marshal(map[string]any{
+		"enabled":      true,
+		"destOverride": []string{"http", "tls", "quic", "fakedns"},
+		"metadataOnly": false,
+		"routeOnly":    false,
+	})
+
+	return &model.Inbound{
+		UserId:         1,
+		Remark:         remark,
+		Enable:         true,
+		Listen:         "",
+		Port:           port,
+		Tag:            tag,
+		Protocol:       "vless",
+		ExpiryTime:     0,
+		DeviceLimit:    0,
+		Settings:       string(settings),
+		StreamSettings: string(streamSettings),
+		Sniffing:       string(sniffing),
+	}, ufwWarning, nil
+}
+
+// 【修改后函数】: 发送【一键配置】的专属消息，增加链接类型判断
+func (t *Tgbot) SendOneClickConfig(inbound *model.Inbound, inFromPanel bool, targetChatId int64) error {
+	var link string
+	var err error
+	var linkType string
+	var dbLinkType string // 【新增】: 用于存入数据库的类型标识
+
+	var streamSettings map[string]any
+	json.Unmarshal([]byte(inbound.StreamSettings), &streamSettings)
+
+	// --- 1. 确定链接和协议类型 ---
+	if security, ok := streamSettings["security"].(string); ok {
+		if security == "reality" {
+			if network, ok := streamSettings["network"].(string); ok && network == "xhttp" {
+				link, err = t.generateXhttpRealityLink(inbound)
+				linkType = "VLESS + XHTTP + Reality"
+				dbLinkType = "vless_xhttp_reality"
+			} else {
+				link, err = t.generateRealityLink(inbound)
+				linkType = "VLESS + TCP + Reality"
+				dbLinkType = "vless_reality"
+			}
+		} else if security == "tls" {
+			link, err = t.generateTlsLink(inbound)
+			linkType = "Vless Encryption + XHTTP + TLS" // 协议类型
+			dbLinkType = "vless_tls_encryption"
+		} else {
+			return fmt.Errorf("未知的入站 security 类型: %s", security)
+		}
+	} else {
+		return errors.New("无法解析 streamSettings 中的 security 字段")
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// 尝试生成二维码，如果失败，则 qrCodeBytes 为 nil 或空
+	qrCodeBytes, err := qrcode.Encode(link, qrcode.Medium, 256)
+	if err != nil {
+		logger.Warningf("生成二维码失败，将尝试发送纯文本链接: %v", err)
+		qrCodeBytes = nil // 确保 qrCodeBytes 为 nil，用于后续判断
+	}
+
+	// --- 2. 获取生成时间 ---
+	now := time.Now().Format("2006-01-02 15:04:05")
+
+	// --- 3. 构造包含所有信息并严格遵循格式的描述消息 ---
+	baseCaption := fmt.Sprintf(
+		"入站备注（用户 Email）：\n\n------->>>  `%s`\n\n对应端口号：\n\n---------->>>>>  `%d`\n\n协议类型：\n\n`%s`\n\n设备限制：0（无限制）\n\n生成时间：\n\n`%s`",
+		inbound.Remark,
+		inbound.Port,
+		linkType,
+		now,
+	)
+
+	var caption string
+	if inFromPanel {
+		caption = fmt.Sprintf("✅ **面板【一键配置】入站已创建成功！**\n\n%s\n\n👇 **可点击下方链接直接【复制/导入】** 👇", baseCaption)
+	} else {
+		caption = fmt.Sprintf("✅ **TG端 远程【一键配置】创建成功！**\n\n%s\n\n👇 **可点击下方链接直接【复制/导入】** 👇", baseCaption)
+	}
+	// 发送主消息（包含描述和二维码）
+	if len(qrCodeBytes) > 0 {
+		// 尝试发送图片消息
+		photoParams := tu.Photo(
+			tu.ID(targetChatId),
+			tu.FileFromBytes(qrCodeBytes, "qrcode.png"),
+		).WithCaption(caption).WithParseMode(telego.ModeMarkdown)
+
+		if _, err := bot.SendPhoto(context.Background(), photoParams); err != nil {
+			logger.Warningf("发送带二维码的 TG 消息给 %d 失败: %v", targetChatId, err)
+			// 如果图片发送失败，回退到发送纯文本描述
+			t.SendMsgToTgbot(targetChatId, caption)
+		}
+	} else {
+		// 如果二维码生成失败，直接发送纯文本描述
+		t.SendMsgToTgbot(targetChatId, caption)
+	}
+
+	// 链接单独发送，不带任何 Markdown 格式。
+	// 这将确保 Telegram 客户端可以将其正确识别为可点击的 vless:// 链接。
+	t.SendMsgToTgbot(targetChatId, link)
+
+	// 使用正确的类型保存历史记录
+	t.saveLinkToHistory(dbLinkType, link)
+
+	return nil
+}
+
+// 【新增辅助函数】: 生成 Reality 链接
+func (t *Tgbot) generateRealityLink(inbound *model.Inbound) (string, error) {
+	var settings map[string]any
+	json.Unmarshal([]byte(inbound.Settings), &settings)
+	clients, _ := settings["clients"].([]interface{})
+	client := clients[0].(map[string]interface{})
+	uuid := client["id"].(string)
+
+	var streamSettings map[string]any
+	json.Unmarshal([]byte(inbound.StreamSettings), &streamSettings)
+	realitySettings := streamSettings["realitySettings"].(map[string]interface{})
+	serverNames := realitySettings["serverNames"].([]interface{})
+	sni := serverNames[0].(string)
+
+	// publicKey 在 realitySettings 下的 settings 子对象中
+	settingsMap, ok := realitySettings["settings"].(map[string]interface{})
+	if !ok {
+		return "", errors.New("realitySettings中缺少settings子对象")
+	}
+	publicKey, ok := settingsMap["publicKey"].(string)
+	if !ok {
+		// 再次检查，以防结构有变，但主要依赖 settingsMap
+		return "", errors.New("publicKey字段缺失或格式错误 (可能在settings子对象中)")
+	}
+
+	shortIdsInterface := realitySettings["shortIds"].([]interface{})
+	// 确保 shortIdsInterface 不为空，否则可能 panic
+	if len(shortIdsInterface) == 0 {
+		return "", errors.New("无法生成 Reality 链接：Short IDs 列表为空")
+	}
+	sid := shortIdsInterface[common.RandomInt(len(shortIdsInterface))].(string)
+
+	domain, err := t.getDomain()
+	if err != nil {
+		return "", err
+	}
+
+	// ---------------------- URL 编码 ----------------------
+	// 必须对查询参数的值（pbk, sni, sid）
+	// Go 标准库中的 net/url.QueryEscape 会处理 Base64 字符串中的 + / 等字符。
+	escapedPublicKey := url.QueryEscape(publicKey)
+	escapedSni := url.QueryEscape(sni)
+	escapedSid := url.QueryEscape(sid)
+	escapedRemark := url.QueryEscape(inbound.Remark)
+
+	return fmt.Sprintf("vless://%s@%s:%d?type=tcp&encryption=none&security=reality&pbk=%s&fp=chrome&sni=%s&sid=%s&spx=%%2F&flow=xtls-rprx-vision#%s-%s",
+		uuid, domain, inbound.Port, escapedPublicKey, escapedSni, escapedSid, escapedRemark, escapedRemark), nil
+}
+
+// 【新增辅助函数】: 生成 TLS 链接
+func (t *Tgbot) generateTlsLink(inbound *model.Inbound) (string, error) {
+	var settings map[string]any
+	json.Unmarshal([]byte(inbound.Settings), &settings)
+	clients, _ := settings["clients"].([]interface{})
+	client := clients[0].(map[string]interface{})
+	uuid := client["id"].(string)
+	encryption := settings["encryption"].(string)
+
+	var streamSettings map[string]any
+	json.Unmarshal([]byte(inbound.StreamSettings), &streamSettings)
+	tlsSettings := streamSettings["tlsSettings"].(map[string]interface{})
+	sni := tlsSettings["serverName"].(string)
+
+	domain, err := t.getDomain()
+	if err != nil {
+		return "", err
+	}
+
+	// 链接格式简化，根据您的前端代码，xhttp 未在链接中体现 path
+	return fmt.Sprintf("vless://%s@%s:%d?type=tcp&encryption=%s&security=tls&fp=chrome&alpn=http%%2F1.1&sni=%s&flow=xtls-rprx-vision#%s-%s",
+		uuid, domain, inbound.Port, encryption, sni, inbound.Remark, inbound.Remark), nil
+}
+
+// 生成 VLESS + XHTTP + Reality 链接的函数
+func (t *Tgbot) generateXhttpRealityLink(inbound *model.Inbound) (string, error) {
+	var settings map[string]any
+	json.Unmarshal([]byte(inbound.Settings), &settings)
+	clients, _ := settings["clients"].([]interface{})
+	client := clients[0].(map[string]interface{})
+	uuid := client["id"].(string)
+
+	var streamSettings map[string]any
+	json.Unmarshal([]byte(inbound.StreamSettings), &streamSettings)
+
+	realitySettings := streamSettings["realitySettings"].(map[string]interface{})
+	serverNames := realitySettings["serverNames"].([]interface{})
+	sni := serverNames[0].(string)
+
+	settingsMap, _ := realitySettings["settings"].(map[string]interface{})
+	publicKey, _ := settingsMap["publicKey"].(string)
+
+	shortIdsInterface, _ := realitySettings["shortIds"].([]interface{})
+	if len(shortIdsInterface) == 0 {
+		return "", errors.New("无法生成 Reality 链接：Short IDs 列表为空")
+	}
+	sid := shortIdsInterface[common.RandomInt(len(shortIdsInterface))].(string)
+
+	xhttpSettings, _ := streamSettings["xhttpSettings"].(map[string]interface{})
+	path := xhttpSettings["path"].(string)
+
+	domain, err := t.getDomain()
+	if err != nil {
+		return "", err
+	}
+
+	// 【中文注释】: 对所有URL查询参数进行编码
+	escapedPath := url.QueryEscape(path)
+	escapedPublicKey := url.QueryEscape(publicKey)
+	escapedSni := url.QueryEscape(sni)
+	escapedSid := url.QueryEscape(sid)
+	escapedRemark := url.QueryEscape(inbound.Remark)
+
+	// 【中文注释】: 严格按照最新格式构建链接
+	return fmt.Sprintf("vless://%s@%s:%d?type=xhttp&encryption=none&path=%s&host=&mode=stream-up&security=reality&pbk=%s&fp=chrome&sni=%s&sid=%s&spx=%%2F#%s-%s",
+		uuid, domain, inbound.Port, escapedPath, escapedPublicKey, escapedSni, escapedSid, escapedRemark, escapedRemark), nil
+}
+
+// 【新增辅助函数】: 发送【订阅转换】安装成功的通知
 func (t *Tgbot) SendSubconverterSuccess() {
-// func (t *Tgbot) SendSubconverterSuccess(targetChatId int64) { 
+	// func (t *Tgbot) SendSubconverterSuccess(targetChatId int64) {
 	domain, err := t.getDomain()
 	if err != nil {
 		domain = "[您的面板域名]"
@@ -3658,6 +4290,17 @@ func (t *Tgbot) getDomain() (string, error) {
 	return domain, nil
 }
 
+// 【新增辅助函数】: 随机字符串生成器
+// 【新增辅助函数】: 1:1 复刻自 inbounds.html
+func (t *Tgbot) generateShortIds() []string {
+	chars := "0123456789abcdef"
+	lengths := []int{2, 4, 6, 8, 10, 12, 14, 16}
+	shortIds := make([]string, len(lengths))
+	for i, length := range lengths {
+		shortIds[i] = t.randomString(length, chars)
+	}
+	return shortIds
+}
 
 // 【新增辅助函数】: 随机字符串生成器
 func (t *Tgbot) randomString(length int, charset string) string {
@@ -3669,81 +4312,93 @@ func (t *Tgbot) randomString(length int, charset string) string {
 	return string(bytes)
 }
 
+// 【新增辅助函数】: 保存链接历史到数据库
+func (t *Tgbot) saveLinkToHistory(linkType string, link string) {
+	history := &database.LinkHistory{
+		Type:      linkType,
+		Link:      link,
+		CreatedAt: time.Now(),
+	}
+	if err := database.AddLinkHistory(history); err != nil {
+		logger.Warningf("保存链接历史到数据库失败: %v", err)
+	}
+	database.Checkpoint()
+}
 
 func (t *Tgbot) handleCallbackQuery(ctx *th.Context, cq telego.CallbackQuery) error {
-    // 1) 确保 Message 可访问 —— 注意必须调用 cq.Message.Message() 而不是直接访问 .Message
-    if cq.Message == nil || cq.Message.Message == nil {
-        _ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID).WithText("消息对象不存在"))
-        return nil
-    }
+	// 1) 确保 Message 可访问 —— 注意必须调用 cq.Message.Message() 而不是直接访问 .Message
+	if cq.Message == nil || cq.Message.Message == nil {
+		_ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID).WithText("消息对象不存在"))
+		return nil
+	}
 
-    // 关键修正：这里要调用方法 Message()
-    msg := cq.Message.Message()   // <- 调用方法，返回 *telego.Message
-    // 现在 msg 是 *telego.Message，可以访问 Chat / MessageID
-    chatIDInt64 := msg.Chat.ID
-    messageID := msg.MessageID
+	// 关键修正：这里要调用方法 Message()
+	msg := cq.Message.Message() // <- 调用方法，返回 *telego.Message
+	// 现在 msg 是 *telego.Message，可以访问 Chat / MessageID
+	chatIDInt64 := msg.Chat.ID
+	messageID := msg.MessageID
 
-    // 解码回调数据（沿用你已有函数）
-    data, err := t.decodeQuery(cq.Data)
-    if err != nil {
-        _ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID).WithText("回调数据解析失败"))
-        return nil
-    }
+	// 解码回调数据（沿用你已有函数）
+	data, err := t.decodeQuery(cq.Data)
+	if err != nil {
+		_ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID).WithText("回调数据解析失败"))
+		return nil
+	}
 
-    // 移除内联键盘（telegoutil 构造 params）
-    if _, err := ctx.Bot().EditMessageReplyMarkup(ctx, tu.EditMessageReplyMarkup(tu.ID(chatIDInt64), messageID, nil)); err != nil {
-        logger.Warningf("TG Bot: 移除内联键盘失败: %v", err)
-    }
+	// 移除内联键盘（telegoutil 构造 params）
+	if _, err := ctx.Bot().EditMessageReplyMarkup(ctx, tu.EditMessageReplyMarkup(tu.ID(chatIDInt64), messageID, nil)); err != nil {
+		logger.Warningf("TG Bot: 移除内联键盘失败: %v", err)
+	}
 
-    // ---------- oneclick_ 分支 ----------
-    if strings.HasPrefix(data, "oneclick_") {
-        configType := strings.TrimPrefix(data, "oneclick_")
+	// ---------- oneclick_ 分支 ----------
+	if strings.HasPrefix(data, "oneclick_") {
+		configType := strings.TrimPrefix(data, "oneclick_")
 
-        var creationMessage string
-        switch configType {
-        case "reality":
-            creationMessage = "🚀 Vless + TCP + Reality + Vision"
-        case "xhttp_reality":
-            creationMessage = "⚡ Vless + XHTTP + Reality"
-        case "tls":
-            creationMessage = "🛡️ Vless Encryption + XHTTP + TLS"
+		var creationMessage string
+		switch configType {
+		case "reality":
+			creationMessage = "🚀 Vless + TCP + Reality + Vision"
+		case "xhttp_reality":
+			creationMessage = "⚡ Vless + XHTTP + Reality"
+		case "tls":
+			creationMessage = "🛡️ Vless Encryption + XHTTP + TLS"
 		case "switch_vision": // 【新增】: 为占位按钮提供单独的提示
 			t.SendMsgToTgbot(chatIDInt64, "此协议组合的功能还在开发中 ............暂不可用...")
 			_ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID).WithText("开发中..."))
 			return nil
-        default:
-            creationMessage = strings.ToUpper(configType)
-        }
+		default:
+			creationMessage = strings.ToUpper(configType)
+		}
 
-        // 注意：不要把无返回值函数当作表达式使用，直接调用即可
-        t.SendMsgToTgbot(chatIDInt64, fmt.Sprintf("🛠️ 正在为您远程创建 %s 配置，请稍候...", creationMessage))
-        _ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID).WithText("配置已创建，请查收管理员私信。"))
-        return nil
-    }
+		// 注意：不要把无返回值函数当作表达式使用，直接调用即可
+		t.SendMsgToTgbot(chatIDInt64, fmt.Sprintf("🛠️ 正在为您远程创建 %s 配置，请稍候...", creationMessage))
+		_ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID).WithText("配置已创建，请查收管理员私信。"))
+		return nil
+	}
 
-    // ---------- confirm_sub_install 分支 ----------
-    if data == "confirm_sub_install" {
-        t.SendMsgToTgbot(chatIDInt64, "🛠️ **已接收到订阅转换安装指令，** 后台正在异步执行...")
+	// ---------- confirm_sub_install 分支 ----------
+	if data == "confirm_sub_install" {
+		t.SendMsgToTgbot(chatIDInt64, "🛠️ **已接收到订阅转换安装指令，** 后台正在异步执行...")
 
-        if err := t.serverService.InstallSubconverter(); err != nil {
-            // 直接调用发送函数（无返回值）
-            t.SendMsgToTgbot(chatIDInt64, fmt.Sprintf("❌ **安装指令启动失败：**\n`%v`", err))
-        } else {
-            t.SendMsgToTgbot(chatIDInt64, "✅ **安装指令已成功发送到后台。**\n\n请等待安装完成的管理员通知。")
-        }
+		if err := t.serverService.InstallSubconverter(); err != nil {
+			// 直接调用发送函数（无返回值）
+			t.SendMsgToTgbot(chatIDInt64, fmt.Sprintf("❌ **安装指令启动失败：**\n`%v`", err))
+		} else {
+			t.SendMsgToTgbot(chatIDInt64, "✅ **安装指令已成功发送到后台。**\n\n请等待安装完成的管理员通知。")
+		}
 
-        _ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID))
-        return nil
-    }
+		_ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID))
+		return nil
+	}
 
-    // 默认回答，避免用户界面卡住
-    _ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID).WithText("操作已完成。"))
-    return nil
+	// 默认回答，避免用户界面卡住
+	_ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID).WithText("操作已完成。"))
+	return nil
 }
 
 // 新增一个公共方法 (大写 G) 来包装私有方法
 func (t *Tgbot) GetDomain() (string, error) {
-    return t.getDomain()
+	return t.getDomain()
 }
 
 // openPortWithUFW 检查/安装 ufw，放行一系列默认端口，并放行指定的端口
@@ -3790,7 +4445,7 @@ func (t *Tgbot) openPortWithUFW(port int) error {
 	else
 		echo "端口 $PORT_TO_OPEN 规则已存在，跳过。"
 	fi
-	
+
 
 	# 4. 检查/激活防火墙
 	if ! ufw status | grep -q "Status: active"; then
@@ -3809,10 +4464,10 @@ func (t *Tgbot) openPortWithUFW(port int) error {
 
 	// 使用 exec.CommandContext 运行完整的 shell 脚本
 	cmd := exec.CommandContext(context.Background(), "/bin/bash", "-c", shellCommand)
-	
+
 	// 捕获命令的标准输出和标准错误
 	output, err := cmd.CombinedOutput()
-	
+
 	// 无论成功与否，都记录完整的 Shell 执行日志，便于调试
 	logOutput := string(output)
 	logger.Infof("执行 ufw 端口放行脚本（目标端口 %d）的完整输出：\n%s", port, logOutput)
@@ -3822,7 +4477,7 @@ func (t *Tgbot) openPortWithUFW(port int) error {
 		return fmt.Errorf("执行 ufw 端口放行脚本时发生错误: %v, Shell 输出: %s", err, logOutput)
 	}
 
-    return nil
+	return nil
 }
 
 // =========================================================================================
@@ -4064,7 +4719,9 @@ func (t *Tgbot) fetchImageFromAPI(apiURL string, sourceName string) (string, err
 	if strings.Contains(sourceName, "waifu.pics") {
 		// waifu.pics (JSON API)
 		body, _ := ioutil.ReadAll(resp.Body)
-		var res struct{ URL string `json:"url"` }
+		var res struct {
+			URL string `json:"url"`
+		}
 		if json.Unmarshal(body, &res) == nil && res.URL != "" {
 			return res.URL, nil
 		}
@@ -4072,7 +4729,9 @@ func (t *Tgbot) fetchImageFromAPI(apiURL string, sourceName string) (string, err
 	} else if strings.Contains(sourceName, "Picsum Photos") {
 		// Picsum Photos (列表 JSON API)
 		body, _ := ioutil.ReadAll(resp.Body)
-		var list []struct{ ID string `json:"id"` }
+		var list []struct {
+			ID string `json:"id"`
+		}
 		if json.Unmarshal(body, &list) == nil && len(list) > 0 {
 			// 这里我们不能使用 safeRandomInt，因为 safeRandomInt 也在依赖 rng
 			// 我们需要使用一个新的随机源或者将 r 传入
@@ -4104,7 +4763,6 @@ type NewsSource struct {
 	API  string
 	Type string // "RSS2JSON" 或 "DirectJSON"
 }
-
 
 // 〔中文注释〕: 辅助函数：核心逻辑，从给定的 API 获取新闻简报。
 // 此函数现在依赖传入的 source.Type 来决定如何解析数据，不再使用模糊的字符串匹配。
@@ -4225,7 +4883,6 @@ func fetchNewsFromGlobalAPI(source NewsSource, limit int) (string, error) {
 	return builder.String(), nil
 }
 
-
 // =========================================================================================
 // 【核心函数：getNewsBriefingWithFallback】 (已重构，确保随机性和来源有效性)
 // =========================================================================================
@@ -4298,17 +4955,17 @@ func (t *Tgbot) SendStickerToTgbot(chatId int64, fileId string) (*telego.Message
 	params := telego.SendStickerParams{
 		ChatID: tu.ID(chatId),
 		// 对于现有 File ID 字符串，必须封装在 telego.InputFile 结构中。
-		Sticker: telego.InputFile{FileID: fileId}, 
+		Sticker: telego.InputFile{FileID: fileId},
 	}
-	
+
 	// 使用全局变量 bot 调用 SendSticker，并传入 context.Background() 和参数指针
 	msg, err := bot.SendSticker(context.Background(), &params)
-	
+
 	if err != nil {
 		logger.Errorf("发送贴纸失败到聊天 ID %d: %v", chatId, err)
 		return nil, err
 	}
-	
+
 	// 成功返回 *telego.Message 对象
 	return msg, nil
 }
